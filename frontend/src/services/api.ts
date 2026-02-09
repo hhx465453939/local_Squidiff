@@ -13,6 +13,50 @@ export type ValidationReport = {
   };
 };
 
+export type UmapPoint = {
+  cell_id: string;
+  x: number;
+  y: number;
+};
+
+export type SeuratInspectReport = {
+  n_cells: number;
+  n_genes: number;
+  metadata_columns: string[];
+  has_umap: boolean;
+  umap?: {
+    key: string;
+    n_points: number;
+    preview_count: number;
+    truncated: boolean;
+    preview: UmapPoint[];
+  } | null;
+  warnings: string[];
+};
+
+export type PrepareTrainingResult = {
+  job_id: string;
+  prepared_dataset_id: string;
+  n_cells: number;
+  n_genes: number;
+  sampling_report: {
+    mode: string;
+    seed: number;
+    input_cells: number;
+    output_cells: number;
+    [key: string]: unknown;
+  };
+  gene_report: {
+    method: string;
+    input_genes: number;
+    output_genes: number;
+    fallback_used?: boolean;
+    fallback_reason?: string | null;
+    selected_genes?: string[];
+    [key: string]: unknown;
+  };
+};
+
 export type DatasetRecord = {
   id: string;
   name: string;
@@ -31,6 +75,9 @@ export type JobRecord = {
   type: "train" | "predict";
   status: "queued" | "running" | "success" | "failed";
   dataset_id: string;
+  source_dataset_id?: string;
+  prepared_dataset_id?: string | null;
+  used_prepared_dataset?: boolean;
   params: Record<string, unknown>;
   model_id?: string;
   result_id?: string;
@@ -154,8 +201,39 @@ export async function validateDataset(input: {
   });
 }
 
+export async function inspectSeurat(input: {
+  datasetId: string;
+  umapPreviewLimit?: number;
+}): Promise<SeuratInspectReport> {
+  const payload = await requestJson<{
+    dataset_id: string;
+    inspect: SeuratInspectReport;
+  }>("/api/seurat/inspect", "POST", {
+    dataset_id: input.datasetId,
+    umap_preview_limit: input.umapPreviewLimit ?? 500
+  });
+  return payload.inspect;
+}
+
+export async function prepareTraining(input: {
+  datasetId: string;
+  groupColumn: string;
+  clusterColumn: string;
+  selectedClusters: string[];
+  seed: number;
+}): Promise<PrepareTrainingResult> {
+  return requestJson<PrepareTrainingResult>("/api/seurat/prepare-training", "POST", {
+    dataset_id: input.datasetId,
+    group_column: input.groupColumn,
+    cluster_column: input.clusterColumn,
+    selected_clusters: input.selectedClusters,
+    seed: input.seed
+  });
+}
+
 export async function createTrainJob(input: {
   datasetId: string;
+  preparedDatasetId?: string;
   geneSize: number;
   outputDim: number;
   useDrugStructure: boolean;
@@ -164,6 +242,7 @@ export async function createTrainJob(input: {
 }): Promise<JobRecord> {
   const payload = await requestJson<{ job: JobRecord }>("/api/jobs/train", "POST", {
     dataset_id: input.datasetId,
+    prepared_dataset_id: input.preparedDatasetId,
     gene_size: input.geneSize,
     output_dim: input.outputDim,
     use_drug_structure: input.useDrugStructure,

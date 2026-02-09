@@ -126,6 +126,16 @@ code {
   gap: 0.6rem;
 }
 
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.umap-preview {
+  max-height: 220px;
+}
+
 .error-list {
   color: #a11d22;
 }

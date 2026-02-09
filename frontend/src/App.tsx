@@ -8,9 +8,13 @@ import {
   getJobLog,
   getModel,
   getResultByJob,
+  inspectSeurat,
   JobRecord,
   ModelRecord,
+  prepareTraining,
+  PrepareTrainingResult,
   ResultRecord,
+  SeuratInspectReport,
   uploadDataset,
   validateDataset,
   ValidationReport
@@ -21,6 +25,13 @@ function formatTime(value?: string | null): string {
     return "-";
   }
   return new Date(value).toLocaleString();
+}
+
+function parseSelectedClusters(input: string): string[] {
+  return input
+    .split(/[,\n;，；]/g)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
 }
 
 export function App() {
@@ -34,6 +45,12 @@ export function App() {
 
   const [dataset, setDataset] = useState<DatasetRecord | null>(null);
   const [validation, setValidation] = useState<ValidationReport | null>(null);
+  const [seuratInspect, setSeuratInspect] = useState<SeuratInspectReport | null>(null);
+  const [prepareSummary, setPrepareSummary] = useState<PrepareTrainingResult | null>(null);
+  const [groupColumn, setGroupColumn] = useState("");
+  const [clusterColumn, setClusterColumn] = useState("");
+  const [selectedClustersText, setSelectedClustersText] = useState("");
+  const [prepareSeed, setPrepareSeed] = useState(42);
   const [rExecMode, setRExecMode] = useState<"direct" | "cmd_conda">("direct");
   const [rCondaEnv, setRCondaEnv] = useState("");
   const [rCondaBat, setRCondaBat] = useState("conda.bat");
@@ -61,6 +78,18 @@ export function App() {
   }, []);
 
   const canValidate = useMemo(() => dataset !== null, [dataset]);
+  const parsedSelectedClusters = useMemo(
+    () => parseSelectedClusters(selectedClustersText),
+    [selectedClustersText]
+  );
+  const canPrepare = useMemo(
+    () =>
+      Boolean(dataset?.path_h5ad) &&
+      groupColumn.trim().length > 0 &&
+      clusterColumn.trim().length > 0 &&
+      parsedSelectedClusters.length > 0,
+    [clusterColumn, dataset?.path_h5ad, groupColumn, parsedSelectedClusters.length]
+  );
   const canTrain = useMemo(
     () => dataset !== null && validation?.valid === true,
     [dataset, validation]
@@ -119,6 +148,12 @@ export function App() {
       });
       setDataset(uploaded);
       setValidation(null);
+      setSeuratInspect(null);
+      setPrepareSummary(null);
+      setGroupColumn("");
+      setClusterColumn("");
+      setSelectedClustersText("");
+      setPrepareSeed(42);
       setJob(null);
       setModel(null);
       setResult(null);
@@ -163,6 +198,74 @@ export function App() {
     }
   }
 
+  async function onInspectSeurat() {
+    if (!dataset) {
+      setGlobalError("请先上传数据");
+      return;
+    }
+
+    setBusyStep("inspect");
+    setGlobalError(null);
+    try {
+      const report = await inspectSeurat({
+        datasetId: dataset.id,
+        umapPreviewLimit: 500
+      });
+      setSeuratInspect(report);
+      if (!groupColumn.trim()) {
+        if (report.metadata_columns.includes("Group")) {
+          setGroupColumn("Group");
+        } else if (report.metadata_columns.length > 0) {
+          setGroupColumn(report.metadata_columns[0]);
+        }
+      }
+      if (!clusterColumn.trim()) {
+        if (report.metadata_columns.includes("Cluster")) {
+          setClusterColumn("Cluster");
+        } else if (report.metadata_columns.includes("celltype")) {
+          setClusterColumn("celltype");
+        } else if (report.metadata_columns.length > 1) {
+          setClusterColumn(report.metadata_columns[1]);
+        } else if (report.metadata_columns.length > 0) {
+          setClusterColumn(report.metadata_columns[0]);
+        }
+      }
+    } catch (err: unknown) {
+      setGlobalError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyStep(null);
+    }
+  }
+
+  async function onPrepareTraining() {
+    if (!dataset) {
+      setGlobalError("请先上传并校验数据");
+      return;
+    }
+    if (!canPrepare) {
+      setGlobalError("请填写分组字段、类群字段和待筛选 clusters");
+      return;
+    }
+    setBusyStep("prepare");
+    setGlobalError(null);
+    try {
+      const prepared = await prepareTraining({
+        datasetId: dataset.id,
+        groupColumn: groupColumn.trim(),
+        clusterColumn: clusterColumn.trim(),
+        selectedClusters: parsedSelectedClusters,
+        seed: prepareSeed
+      });
+      setPrepareSummary(prepared);
+      setGeneSize(prepared.n_genes);
+      setOutputDim(prepared.n_genes);
+    } catch (err: unknown) {
+      setGlobalError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyStep(null);
+    }
+  }
+
   async function onSubmitTrain() {
     if (!dataset) {
       setGlobalError("请先上传并校验数据");
@@ -173,6 +276,7 @@ export function App() {
     try {
       const newJob = await createTrainJob({
         datasetId: dataset.id,
+        preparedDatasetId: prepareSummary?.prepared_dataset_id,
         geneSize,
         outputDim,
         useDrugStructure,
@@ -194,7 +298,7 @@ export function App() {
     <main className="app-shell">
       <header className="hero">
         <h1>Squidiff LabFlow MVP</h1>
-        <p>上传 → 校验 → 训练任务 → 轮询状态 → 结果页</p>
+        <p>上传 → 校验 → Seurat 检查 → 500x500 预处理 → 训练任务 → 结果页</p>
       </header>
 
       <section className="panel">
@@ -326,7 +430,147 @@ export function App() {
       </section>
 
       <section className="panel">
-        <h2>3) 提交训练任务</h2>
+        <h2>3) Seurat 解析（V2 Phase 1）</h2>
+        <p>读取 metadata 字段和 UMAP 预览（rds/h5seurat 需先校验转换为 h5ad）。</p>
+        <button
+          disabled={!dataset?.path_h5ad || busyStep !== null}
+          onClick={onInspectSeurat}
+        >
+          {busyStep === "inspect" ? "解析中..." : "解析 Seurat"}
+        </button>
+
+        {seuratInspect ? (
+          <div className="stack">
+            <div className="kv">
+              <span>n_cells</span>
+              <code>{seuratInspect.n_cells}</code>
+              <span>n_genes</span>
+              <code>{seuratInspect.n_genes}</code>
+              <span>has_umap</span>
+              <code>{seuratInspect.has_umap ? "yes" : "no"}</code>
+            </div>
+
+            <div>
+              <h3>metadata 字段</h3>
+              {seuratInspect.metadata_columns.length > 0 ? (
+                <div className="chip-list">
+                  {seuratInspect.metadata_columns.map((column) => (
+                    <code key={column}>{column}</code>
+                  ))}
+                </div>
+              ) : (
+                <p>未找到 metadata 列。</p>
+              )}
+            </div>
+
+            <div>
+              <h3>UMAP 预览</h3>
+              {seuratInspect.umap ? (
+                <div className="stack">
+                  <div className="kv">
+                    <span>key</span>
+                    <code>{seuratInspect.umap.key}</code>
+                    <span>points</span>
+                    <code>
+                      {seuratInspect.umap.preview_count}/{seuratInspect.umap.n_points}
+                    </code>
+                  </div>
+                  <pre className="log umap-preview">
+                    {JSON.stringify(seuratInspect.umap.preview.slice(0, 30), null, 2)}
+                  </pre>
+                </div>
+              ) : (
+                <p>无 UMAP 数据（不阻断后续流程）。</p>
+              )}
+            </div>
+
+            {seuratInspect.warnings.length > 0 ? (
+              <ul>
+                {seuratInspect.warnings.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
+
+      <section className="panel">
+        <h2>4) 500x500 预处理（V2 Phase 2）</h2>
+        <div className="form-grid compact">
+          <label>
+            分组字段（group_column）
+            <input
+              value={groupColumn}
+              onChange={(e) => setGroupColumn(e.target.value)}
+              placeholder="例如: sample"
+              list="metadata-columns"
+            />
+          </label>
+          <label>
+            类群字段（cluster_column）
+            <input
+              value={clusterColumn}
+              onChange={(e) => setClusterColumn(e.target.value)}
+              placeholder="例如: celltype"
+              list="metadata-columns"
+            />
+          </label>
+          <label>
+            随机种子（seed）
+            <input
+              type="number"
+              value={prepareSeed}
+              onChange={(e) => setPrepareSeed(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            待筛选 clusters（逗号分隔）
+            <input
+              value={selectedClustersText}
+              onChange={(e) => setSelectedClustersText(e.target.value)}
+              placeholder="例如: T,B,NK"
+            />
+          </label>
+        </div>
+        <datalist id="metadata-columns">
+          {seuratInspect?.metadata_columns.map((column) => (
+            <option key={column} value={column} />
+          ))}
+        </datalist>
+        <button disabled={!canPrepare || busyStep !== null} onClick={onPrepareTraining}>
+          {busyStep === "prepare" ? "预处理中..." : "准备训练数据（500x500）"}
+        </button>
+        {prepareSummary ? (
+          <div className="stack">
+            <p className="status">预处理完成，可直接进入训练。</p>
+            <div className="kv">
+              <span>prepared_dataset_id</span>
+              <code>{prepareSummary.prepared_dataset_id}</code>
+              <span>n_cells</span>
+              <code>{prepareSummary.n_cells}</code>
+              <span>n_genes</span>
+              <code>{prepareSummary.n_genes}</code>
+              <span>sampling_method</span>
+              <code>{prepareSummary.sampling_report.mode}</code>
+              <span>gene_method</span>
+              <code>{prepareSummary.gene_report.method}</code>
+            </div>
+          </div>
+        ) : (
+          <p>未执行预处理时，训练接口会自动尝试使用该数据集最近一次 prepared dataset。</p>
+        )}
+      </section>
+
+      <section className="panel">
+        <h2>5) 提交训练任务</h2>
+        {prepareSummary ? (
+          <p className="status">
+            当前训练默认使用 prepared_dataset_id: {prepareSummary.prepared_dataset_id}
+          </p>
+        ) : (
+          <p>当前训练将使用 dataset_id，若存在历史 prepared 数据集将由后端自动选择最新版本。</p>
+        )}
         <div className="form-grid compact">
           <label>
             gene_size
@@ -368,7 +612,7 @@ export function App() {
       </section>
 
       <section className="panel">
-        <h2>4) 任务轮询状态</h2>
+        <h2>6) 任务轮询状态</h2>
         {job ? (
           <div className="stack">
             <div className="kv">
@@ -376,6 +620,12 @@ export function App() {
               <code>{job.id}</code>
               <span>status</span>
               <code>{job.status}</code>
+              <span>source_dataset_id</span>
+              <code>{job.source_dataset_id ?? "-"}</code>
+              <span>train_dataset_id</span>
+              <code>{job.dataset_id}</code>
+              <span>prepared_dataset_id</span>
+              <code>{job.prepared_dataset_id ?? "-"}</code>
               <span>started</span>
               <code>{formatTime(job.started_at)}</code>
               <span>ended</span>
@@ -389,7 +639,7 @@ export function App() {
       </section>
 
       <section className="panel">
-        <h2>5) 结果页</h2>
+        <h2>7) 结果页</h2>
         {job?.status === "success" ? (
           <div className="stack">
             <p>训练已完成。</p>

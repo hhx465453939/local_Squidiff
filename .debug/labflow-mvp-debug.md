@@ -13,15 +13,22 @@
 - `backend/app/services/job_queue.py`
 - `backend/app/services/squidiff_runner.py`
 - `backend/app/services/seurat_converter.py`
+- `backend/app/services/seurat_inspector.py`
+- `backend/app/services/dataset_preprocessor.py`
 - `frontend/src/App.tsx`
 - `frontend/src/services/api.ts`
+- `backend/app/api/seurat.py`
+- `backend/tests/test_seurat_api.py`
+- `backend/tests/test_dataset_preprocessor.py`
+- `backend/tests/test_jobs_api.py`
+- `docs/api/seurat.md`
 - `infra/docker-compose.yml`
 - Dependency modules:
 - `train_squidiff.py`
 - `sample_squidiff.py`
 
 ## Runtime Context and Test Rules
-- Runtime environment: Local Windows (PowerShell workspace `E:\Development\Squidiff`)
+- Runtime environment: Local Windows (PowerShell workspace `E:\Development\local_Squidiff`)
 - SSH mode (if remote): Not used in this implementation round
 - Remote project path (if remote): N/A
 - Validation/Checkfix execution mode: Run commands directly in local shell
@@ -130,10 +137,116 @@
 - Impact assessment
 - V2 scope is now explicit and implementation-ready for phased development.
 
+### [2026-02-10 01:xx] V2 Phase 1 initial implementation: Seurat inspect API + UI hook
+- Problem
+- Need to start implementing PRD V2 with API-first order, beginning from Seurat inspection capability.
+- Root cause
+- Existing MVP lacked a dedicated endpoint to expose metadata columns and UMAP preview from uploaded datasets.
+- Solution
+- Added backend Seurat inspection service and API endpoint: `POST /api/seurat/inspect`.
+- Added frontend API client + new UI section to trigger inspection and render metadata/UMAP preview.
+- Added API documentation and minimal backend endpoint tests.
+- Code changes (files/functions)
+- `backend/app/services/seurat_inspector.py` (`inspect_h5ad` and helpers)
+- `backend/app/api/seurat.py` (`inspect_seurat` endpoint)
+- `backend/app/main.py` (router registration)
+- `frontend/src/services/api.ts` (`inspectSeurat`, inspect response types)
+- `frontend/src/App.tsx` (new "Seurat 解析" step)
+- `frontend/src/styles/tokens.css` (`chip-list`, `umap-preview`)
+- `backend/tests/test_seurat_api.py` (404 + missing h5ad path checks)
+- `docs/api/seurat.md` (new API doc)
+- Verification results
+- Frontend:
+- `npm run lint`: passed.
+- `npm run build`: passed.
+- Backend smoke:
+- `python` + `fastapi.testclient` script: `/api/health` 200 and `/api/seurat/inspect` missing dataset -> 404.
+- Backend static check:
+- `ruff check backend/app backend/tests`: passed (using custom `RUFF_CACHE_DIR` due default cache permission issue).
+- Additional note:
+- `uv run pytest ...` is still blocked by existing project dependency resolution constraints (`scanpy` + broad `requires-python`).
+- Impact assessment
+- PRD V2 Phase 1 now has a usable backend contract and frontend integration point.
+- Full interactive筛选与500x500预处理（prepare-training）仍待后续 Phase 2/3 开发。
+
+### [2026-02-10 02:xx] V2 Phase 2 implementation: prepare-training pipeline (500x500)
+- Problem
+- Need to implement PRD V2 Phase 2 backend pipeline with API contract: `/api/seurat/prepare-training` + job status query.
+- Root cause
+- Existing code can inspect Seurat metadata/UMAP but cannot produce bounded training matrix (`<=500 cells`, `<=500 genes`) with traceable reports.
+- Solution
+- Added dataset preprocessing service with:
+- 1) cluster filtering by `selected_clusters`,
+- 2) stratified sampling (`Group -> Cluster`) capped at 500 cells,
+- 3) DEG-based gene selection (Wilcoxon) capped at 500 genes, with fallback to HVG/variance ranking.
+- Added prepare-training APIs:
+- `POST /api/seurat/prepare-training` for execution + dataset registration.
+- `GET /api/seurat/prepare-training/{job_id}` for status/result.
+- Added dedicated JSON state bucket for Seurat prepare jobs and API docs/tests.
+- Code changes (files/functions)
+- `backend/app/services/dataset_preprocessor.py`
+- `stratified_sample_cells`, `select_top_genes`, `prepare_training_dataset`.
+- `backend/app/api/seurat.py`
+- `SeuratPrepareTrainingPayload`, `prepare_training`, `get_prepare_training_job`.
+- `backend/app/storage/state_manager.py`
+- new `seurat_prepare_jobs` store methods.
+- `backend/tests/test_dataset_preprocessor.py`
+- deterministic/bounded sampling tests.
+- `backend/tests/test_seurat_api.py`
+- prepare-training endpoint contract tests (error + success path with stubbed preprocessor).
+- `docs/api/seurat.md`
+- Phase 2 endpoints and payload/response docs.
+- Verification results
+- `ruff check backend/app backend/tests`: passed.
+- `ruff format --check backend/app backend/tests`: passed.
+- Backend smoke (with stubbed preprocessor): passed.
+- `POST /api/seurat/prepare-training` returns `job_id` + `prepared_dataset_id`.
+- `GET /api/seurat/prepare-training/{job_id}` returns `status=success`.
+- Additional note
+- `uv run pytest` remains blocked by existing dependency resolution issue (`scanpy` vs broad `requires-python` range), same as previous rounds.
+- Impact assessment
+- PRD V2 Phase 2 backend contract and core algorithm pipeline are now in place.
+- Remaining PRD work is mainly Phase 3/4 (training flow默认接 prepared_dataset_id + frontend筛选页增强 + docs/UAT).
+
+### [2026-02-10 02:xx] V2 Phase 3 implementation: train default prepared dataset + frontend summary
+- Problem
+- Need to make training jobs default to `prepared_dataset_id` and expose preprocessing source/summary in frontend.
+- Root cause
+- Train API previously always used incoming `dataset_id`, and frontend lacked prepare-summary context for training source traceability.
+- Solution
+- Backend train endpoint now resolves training dataset in priority:
+- 1) if request `dataset_id` is already a prepared dataset, use itself;
+- 2) else if `prepared_dataset_id` provided, validate it belongs to source dataset and use it;
+- 3) else auto-pick latest prepared dataset derived from source dataset.
+- Job metadata now includes `source_dataset_id`, `prepared_dataset_id`, `used_prepared_dataset`, plus param trace (`requested_dataset_id`, `train_dataset_id`).
+- Frontend added prepare-training call/summary state and uses `prepared_dataset_id` by default when submitting train.
+- Training and job status panels now show preprocessing summary and training source trace fields.
+- Code changes (files/functions)
+- `backend/app/api/jobs.py`
+- `TrainJobPayload.prepared_dataset_id`, `_latest_prepared_dataset`, updated `submit_train_job`.
+- `backend/tests/test_jobs_api.py`
+- auto-select latest prepared + mismatched prepared id rejection tests.
+- `frontend/src/services/api.ts`
+- `prepareTraining` client, `PrepareTrainingResult`, extended `JobRecord`, train payload supports `preparedDatasetId`.
+- `frontend/src/App.tsx`
+- Phase 2 prepare form action, preprocessing summary display, default train-source wiring to prepared dataset, job trace fields.
+- Verification results
+- Backend checkfix:
+- `ruff check backend/app backend/tests`: passed.
+- `ruff format --check backend/app backend/tests`: passed.
+- Frontend checkfix:
+- `npm run lint`: passed.
+- `npm run build`: passed.
+- Backend smoke:
+- train default prepared dataset selection script: passed (`phase3-train-default-smoke-ok`).
+- Impact assessment
+- Phase 3 core requirement is now met: train flow defaults to prepared dataset when available and source is visible in UI.
+- Remaining items are mainly Phase 4 docs/UAT and richer交互筛选体验优化.
+
 ## Open Issues
 - Real-world Seurat conversion relies on local R/SeuratDisk availability.
 - Production auth is intentionally simplified for MVP.
-- V2 features in new PRD are not yet implemented in code.
+- Full E2E Phase 2 run still depends on runtime `scanpy` + actual h5ad data availability.
 
 ## Technical Debt
 - JSON file storage has limited concurrency compared with database-backed approach.

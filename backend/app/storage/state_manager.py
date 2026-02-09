@@ -21,6 +21,7 @@ class JsonStateStore:
         self._files = {
             "datasets": state_dir / "datasets.json",
             "jobs": state_dir / "jobs.json",
+            "seurat_prepare_jobs": state_dir / "seurat_prepare_jobs.json",
             "models": state_dir / "models.json",
             "results": state_dir / "results.json",
         }
@@ -110,6 +111,22 @@ class JsonStateStore:
 
     def update_job(self, job_id: str, patch: dict[str, Any]) -> dict[str, Any] | None:
         return self._update("jobs", job_id, patch)
+
+    def create_seurat_prepare_job(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._create("seurat_prepare_jobs", payload)
+
+    def get_seurat_prepare_job(self, job_id: str) -> dict[str, Any] | None:
+        return self._get("seurat_prepare_jobs", job_id)
+
+    def list_seurat_prepare_jobs(self) -> list[dict[str, Any]]:
+        return self._list("seurat_prepare_jobs")
+
+    def update_seurat_prepare_job(
+        self,
+        job_id: str,
+        patch: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        return self._update("seurat_prepare_jobs", job_id, patch)
 
     def create_model(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._create("models", payload)

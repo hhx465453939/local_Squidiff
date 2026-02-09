@@ -12,6 +12,7 @@ router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
 class TrainJobPayload(BaseModel):
     dataset_id: str
+    prepared_dataset_id: str | None = None
     gene_size: int = Field(gt=0)
     output_dim: int = Field(gt=0)
     use_drug_structure: bool = False
@@ -27,6 +28,23 @@ class PredictJobPayload(BaseModel):
     gene_size: int = Field(gt=0)
     output_dim: int = Field(gt=0)
     use_drug_structure: bool = False
+
+
+def _latest_prepared_dataset(source_dataset_id: str) -> dict[str, object] | None:
+    candidates = [
+        item
+        for item in store.list_datasets()
+        if item.get("prepared_from_dataset_id") == source_dataset_id
+        and isinstance(item.get("path_h5ad"), str)
+        and item.get("path_h5ad")
+    ]
+    if not candidates:
+        return None
+    candidates.sort(
+        key=lambda item: str(item.get("updated_at") or item.get("created_at") or ""),
+        reverse=True,
+    )
+    return candidates[0]
 
 
 @router.get("")
@@ -68,12 +86,55 @@ def submit_train_job(payload: TrainJobPayload) -> dict[str, object]:
     if dataset is None:
         raise HTTPException(status_code=404, detail="Dataset not found")
 
+    requested_dataset_id = payload.dataset_id
+    train_dataset = dataset
+    source_dataset_id = requested_dataset_id
+    prepared_dataset_id: str | None = None
+    used_prepared_dataset = False
+
+    requested_from_id = dataset.get("prepared_from_dataset_id")
+    if isinstance(requested_from_id, str) and requested_from_id:
+        source_dataset_id = requested_from_id
+        prepared_dataset_id = dataset["id"]
+        used_prepared_dataset = True
+    elif payload.prepared_dataset_id:
+        prepared_dataset = store.get_dataset(payload.prepared_dataset_id)
+        if prepared_dataset is None:
+            raise HTTPException(status_code=404, detail="Prepared dataset not found")
+        if prepared_dataset.get("prepared_from_dataset_id") != requested_dataset_id:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "prepared_dataset_id does not belong to the provided dataset_id. "
+                    "Please use a matching prepared dataset."
+                ),
+            )
+        train_dataset = prepared_dataset
+        prepared_dataset_id = prepared_dataset["id"]
+        used_prepared_dataset = True
+    else:
+        auto_prepared_dataset = _latest_prepared_dataset(requested_dataset_id)
+        if auto_prepared_dataset is not None:
+            train_dataset = auto_prepared_dataset
+            prepared_dataset_id = auto_prepared_dataset["id"]
+            used_prepared_dataset = True
+
+    params = payload.model_dump(exclude_none=True)
+    params["requested_dataset_id"] = requested_dataset_id
+    params["train_dataset_id"] = train_dataset["id"]
+    params["auto_selected_prepared_dataset"] = (
+        payload.prepared_dataset_id is None and used_prepared_dataset
+    )
+
     job = store.create_job(
         {
             "type": "train",
             "status": "queued",
-            "dataset_id": payload.dataset_id,
-            "params": payload.model_dump(),
+            "dataset_id": train_dataset["id"],
+            "source_dataset_id": source_dataset_id,
+            "prepared_dataset_id": prepared_dataset_id,
+            "used_prepared_dataset": used_prepared_dataset,
+            "params": params,
             "error_msg": None,
             "started_at": None,
             "ended_at": None,
