@@ -1,53 +1,180 @@
-# AGENTS.md - Codex Full-Stack Dev Environment
+# AGENTS.md - local_Squidiff 协作与开发规范
 
-This project includes pre-installed Codex skills (`.codex/skills/`) covering the full development lifecycle.
+> 作用：给 AI Coding Agent 与协作者提供统一上下文。  
+> 范围：本文件所在目录及其子目录。  
+> 当前仓库路径：`E:\Development\local_Squidiff`
 
-## Available Skills
+---
 
-| Skill | Trigger Scenarios | Path |
-|-------|-------------------|------|
-| `api-first-modular` | Frontend/backend development, cross-layer task decomposition, API design | `.codex/skills/api-first-modular/` |
-| `code-debugger` | Bug fixing, performance tuning, incremental development | `.codex/skills/code-debugger/` |
-| `debug-ui` | Frontend UI debugging - styling, interaction, rendering issues | `.codex/skills/debug-ui/` |
-| `ai-spec` | Natural language requirements to precise technical spec translation | `.codex/skills/ai-spec/` |
-| `ralph` | Autonomous development loop driven by PRD | `.codex/skills/ralph/` |
+## 1. 项目定位
 
-## Core Rules
+本仓库包含两条并行能力线：
 
-- **API-First**: Every backend feature must be encapsulated as an independent API package (Implement -> Checkfix -> Encapsulate -> Expose API -> Document API). Frontend only consumes APIs per documentation - no business logic in the frontend.
-- **Layer-scoped debugging**: Identify the bug's owning layer before making changes. Never apply cross-layer workarounds.
-- **Ordered cross-layer execution**: Backend first -> API docs -> frontend consumption -> integration verification.
+1. **研究脚本线（根目录）**  
+   - `train_squidiff.py` / `sample_squidiff.py`
+   - 面向模型训练与推理
 
-## Skills
+2. **LabFlow Web 线（前后端）**  
+   - `backend/` + `frontend/` + `infra/`
+   - 面向实验室内网工作流（上传、校验、Seurat 检查、500x500 预处理、训练任务、结果展示）
 
-A skill is a set of local instructions stored in a `SKILL.md` file. The list below includes name, description, and path so you can open each source when needed.
+---
 
-### Available skills
+## 2. 架构与层级边界（强约束）
 
-- ai-spec: Converts natural language requirements into production-grade technical specs and executable AI instructions. Use when requirements are unclear, architecture choices are needed, or a complete task list is required. (file: `E:/Development/Squidiff/.codex/skills/ai-spec/SKILL.md`)
-- api-first-modular: API-first modular workflow. Backend features are packaged as independent APIs, frontend only calls APIs, and cross-layer work is split by API boundaries. Use for backend feature work, frontend API consumption, cross-layer decomposition, and bug fixing after layer ownership is identified. (file: `E:/Development/Squidiff/.codex/skills/api-first-modular/SKILL.md`)
-- code-debugger: Deep-context debugging and incremental development workflow. Use for bug fixing, performance issues, variable tracing, and iterative extension of existing modules while maintaining `.debug/` records. (file: `E:/Development/Squidiff/.codex/skills/code-debugger/SKILL.md`)
-- debug-ui: UI design and implementation workflow driven by product vibe. Converts high-level visual intent into precise CSS/design tokens and records design decisions (ADR) in `.debug/`. (file: `E:/Development/Squidiff/.codex/skills/debug-ui/SKILL.md`)
-- ralph: PRD-driven autonomous agent loop. Converts Markdown PRD into `prd.json`, then iterates user stories with fresh agent runs until completion. (file: `E:/Development/Squidiff/.codex/skills/ralph/SKILL.md`)
-- skill-creator: Guide for creating or updating skills that extend Codex capabilities with specialized workflows or integrations. (file: `C:/Users/DamnCheater/.codex/skills/.system/skill-creator/SKILL.md`)
-- skill-installer: Installs skills into `$CODEX_HOME/skills` from curated lists or GitHub paths, including private repos. (file: `C:/Users/DamnCheater/.codex/skills/.system/skill-installer/SKILL.md`)
+### 2.1 三层职责
+- **前端层 (`frontend/`)**：页面渲染、用户交互、调用 API、状态展示。
+- **后端层 (`backend/app/`)**：业务逻辑、数据处理、任务调度、API 暴露。
+- **存储执行层 (`backend/state/`, `backend/uploads/`, `backend/artifacts/`)**：
+  - JSON 状态存储
+  - 上传数据、预处理输出
+  - 训练与预测产物
 
-### How to use skills
+### 2.2 禁止事项
+- 不在前端实现后端业务逻辑。
+- 不用前端绕过后端 bug。
+- 不跨层做临时 workaround 代替根因修复。
 
-- Discovery: The list above defines the skills available in this session. Skill bodies live at the listed paths.
-- Trigger rules: If the user names a skill (with `$SkillName` or plain text), or if the request clearly matches a listed skill description, use that skill for the current turn. If multiple skills are named, use all relevant ones. Do not carry skills across turns unless re-mentioned.
-- Missing/blocked: If a named skill is unavailable or unreadable, state it briefly and continue with the best fallback.
-- How to use a skill (progressive disclosure):
-  1) After selecting a skill, open its `SKILL.md` and read only what is needed.
-  2) Resolve relative paths in `SKILL.md` against that skill directory first.
-  3) If extra folders (for example, `references/`) are mentioned, load only specific files needed for the task.
-  4) If `scripts/` exist, prefer running or patching them over retyping large code blocks.
-  5) Reuse assets/templates when available.
-- Coordination and sequencing:
-  - If multiple skills apply, choose the minimal set and state the execution order.
-  - Announce which skills are used and why in one short line. If skipping an obvious skill, say why.
-- Context hygiene:
-  - Keep context small. Summarize long sections and load extra files only when required.
-  - Avoid deep reference chasing. Open files directly linked from `SKILL.md` unless blocked.
-  - When variants exist (framework/provider/domain), choose only the relevant references and note the choice.
-- Safety and fallback: If a skill cannot be cleanly applied (missing files, unclear instructions), state the issue and continue with the next-best approach.
+---
+
+## 3. API-First 开发流程（强约束）
+
+后端每个功能按以下 5 步闭环执行：
+
+1. Implement（实现）
+2. Checkfix（lint/format/build）
+3. Encapsulate（服务层封装）
+4. Expose API（路由与契约）
+5. Document API（同步文档）
+
+跨层任务执行顺序固定：
+
+1. 后端实现
+2. API 文档更新
+3. 前端接入
+4. 集成验证
+
+---
+
+## 4. 运行与部署上下文
+
+### 4.1 本地开发（默认）
+- Backend: `uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000`
+- Frontend: `cd frontend && npm run dev`
+
+### 4.2 Docker 部署
+- 配置文件：`infra/docker-compose.yml`
+- 环境变量模板：`infra/.env.example`
+
+### 4.3 R 转换执行模式
+- `LABFLOW_R_EXEC_MODE=direct|cmd_conda`
+- `cmd_conda` 需要正确设置：
+  - `LABFLOW_R_CONDA_ENV`
+  - `LABFLOW_R_CONDA_BAT`
+
+---
+
+## 5. 当前后端模块与 API（速查）
+
+### 5.1 `backend/app/api/datasets.py`
+- 上传与校验
+- `POST /api/datasets/upload`
+- `POST /api/datasets/{dataset_id}/validate`
+
+### 5.2 `backend/app/api/seurat.py`
+- V2 inspect + prepare-training
+- `POST /api/seurat/inspect`
+- `POST /api/seurat/prepare-training`
+- `GET /api/seurat/prepare-training/{job_id}`
+
+### 5.3 `backend/app/api/jobs.py`
+- 训练/预测任务
+- `POST /api/jobs/train`（默认优先使用 prepared dataset）
+- `POST /api/jobs/predict`
+- `GET /api/jobs/{job_id}`
+- `GET /api/jobs/{job_id}/log`
+
+### 5.4 `backend/app/api/results.py`
+- 结果、模型、资产访问
+
+---
+
+## 6. 状态与数据文件（不可忽略）
+
+- `backend/state/datasets.json`
+- `backend/state/jobs.json`
+- `backend/state/seurat_prepare_jobs.json`
+- `backend/state/models.json`
+- `backend/state/results.json`
+
+上传/产物目录：
+- `backend/uploads/`
+- `backend/artifacts/`
+
+---
+
+## 7. 文档同步规则（强约束）
+
+当你修改以下内容时，必须同步文档：
+
+- API 变更 -> 更新 `docs/api/*.md`
+- 数据流程或部署变更 -> 更新 `README.md` 与 `docs/部署文档.md`
+- Seurat 流程变更 -> 更新 `docs/seurat转换指南.md`
+- 交付与验收变更 -> 更新 `docs/UAT_Seurat_V2_检查清单.md`
+
+---
+
+## 8. Checkfix 规则
+
+### 8.1 Python
+```bash
+ruff check backend/app backend/tests
+ruff format --check backend/app backend/tests
+```
+
+### 8.2 Frontend
+```bash
+cd frontend
+npm run lint
+npm run build
+```
+
+### 8.3 UAT 脚本（Phase 4）
+```bash
+python scripts/uat_phase4_seurat_v2.py --help
+```
+
+---
+
+## 9. Skills（可用能力）
+
+本仓库内置 skills 目录：`.codex/skills/`
+
+| Skill | 场景 | 路径 |
+|---|---|---|
+| `api-first-modular` | 前后端分层、API 优先、跨层分解 | `.codex/skills/api-first-modular/` |
+| `code-debugger` | Bug 修复、增量开发、`.debug/` 记录 | `.codex/skills/code-debugger/` |
+| `debug-ui` | 前端样式与交互调试 | `.codex/skills/debug-ui/` |
+| `ai-spec` | 需求转技术规格 | `.codex/skills/ai-spec/` |
+| `ralph` | PRD 驱动任务循环 | `.codex/skills/ralph/` |
+
+---
+
+## 10. Skill 触发规则
+
+- 用户显式提到 skill 名（如 `$code-debugger`）-> 必须使用该 skill。
+- 任务语义明显匹配 skill 描述 -> 应主动使用。
+- 同时命中多个 skill -> 选择最小必要集合并说明执行顺序。
+
+---
+
+## 11. `.debug/` 记录规则
+
+- 按模块维护调试历史，统一放在 `.debug/`。
+- 每次非微小改动应更新对应 debug 文档，记录：
+  - 问题与根因
+  - 变更文件与函数
+  - 检查命令与结果
+  - 影响面与后续事项
+
+当前主记录：`.debug/labflow-mvp-debug.md`

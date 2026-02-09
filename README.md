@@ -1,220 +1,236 @@
-<div align="center">
-  <img src="squidiff_logo.png" width="96" alt="Squidiff logo" />
-  <h1>Squidiff</h1>
-  <p><strong>Predicting cellular development and perturbation responses with diffusion models</strong></p>
-  <p><strong>基于扩散模型预测细胞发育与扰动响应</strong></p>
-</div>
+# Squidiff LabFlow（本仓库说明）
 
-[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
-[![PyTorch 2.0+](https://img.shields.io/badge/PyTorch-2.0%2B-ee4c2c.svg)](https://pytorch.org/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+> 这是一个“研究模型 + 内网 Web 工作流”的混合仓库。  
+> 你既可以直接用 `train_squidiff.py` / `sample_squidiff.py` 做模型训练推理，也可以用前后端 Web 流程完成 Seurat 数据上传、500x500 预处理、训练与结果查看。
 
-## 1. Overview / 项目概览
+---
 
-**EN:** Squidiff is a diffusion-model framework for single-cell transcriptomics.  
-**中文：** Squidiff 是一个面向单细胞转录组任务的扩散模型框架。  
+## 1. 项目功能总览
 
-**EN:** It learns transitions from baseline cellular states to perturbed states and generates predicted expression profiles.  
-**中文：** 它学习细胞从基线状态到扰动状态的转换过程，并生成预测表达谱。  
+### 1.1 研究模型能力（根目录脚本）
+- 基于扩散模型的单细胞转录组预测。
+- 支持基础模式与药物结构模式（`SMILES + dose`）。
+- 入口脚本：
+  - `train_squidiff.py`
+  - `sample_squidiff.py`
 
-## 2. What You Can Do / 能做什么
+### 1.2 LabFlow Web 能力（`backend/` + `frontend/`）
+- 数据上传与格式校验（支持 `.h5ad/.rds/.h5seurat`）。
+- Seurat 检查（metadata 字段 + UMAP 预览）。
+- 训练前预处理（Phase 2）：
+  - cluster 过滤
+  - 最多 500 cells 分层抽样
+  - 最多 500 genes 筛选（Wilcoxon + fallback）
+- 训练任务提交与轮询（Phase 3）：
+  - 默认优先使用 `prepared_dataset_id`
+  - 训练来源可追溯（`source_dataset_id`、`train_dataset_id`、`prepared_dataset_id`）
+- 结果资产查看（模型信息、预测图像、日志）。
 
-- **EN:** Predict transcriptomic responses to drugs and gene perturbations.  
-  **中文：** 预测药物和基因扰动后的转录组响应。  
-- **EN:** Model cell-state trajectories in development and differentiation tasks.  
-  **中文：** 建模细胞发育与分化过程中的状态轨迹。  
-- **EN:** Integrate optional molecular structure features (SMILES + dose).  
-  **中文：** 支持可选的分子结构特征（SMILES + dose）融合。  
+---
 
-## 3. Installation / 安装
+## 2. 当前架构（前后端 + 任务执行）
 
-### 3.1 PyPI
+```text
+Frontend (React/Vite)
+   |
+   | HTTP / JSON
+   v
+FastAPI backend
+   ├─ /api/datasets   (上传/校验/转换)
+   ├─ /api/seurat     (inspect + prepare-training)
+   ├─ /api/jobs       (train/predict + poll + log)
+   └─ /api/results    (模型/结果/资产)
+   |
+   v
+JsonStateStore (backend/state/*.json)
+   |
+   v
+JobQueue worker
+   |
+   v
+SquidiffRunner -> train_squidiff.py / sample_squidiff.py
+```
+
+### 2.1 后端核心目录
+- `backend/app/api/`：REST API 路由。
+- `backend/app/services/`：业务服务层（转换、检查、预处理、任务执行）。
+- `backend/app/storage/state_manager.py`：文件型状态存储。
+- `backend/state/`：状态 JSON（`datasets/jobs/seurat_prepare_jobs/models/results`）。
+- `backend/uploads/`：上传与预处理输出。
+- `backend/artifacts/`：训练/预测任务产物与日志。
+
+### 2.2 前端核心目录
+- `frontend/src/App.tsx`：单页流程 UI（上传 -> 校验 -> inspect -> prepare -> train -> 结果）。
+- `frontend/src/services/api.ts`：API 类型与请求封装。
+- `frontend/src/styles/tokens.css`：样式 token 与页面样式。
+
+---
+
+## 3. API 概览
+
+### 3.1 健康检查
+- `GET /api/health`
+
+### 3.2 数据集
+- `GET /api/datasets`
+- `POST /api/datasets/upload`
+- `POST /api/datasets/{dataset_id}/validate`
+
+### 3.3 Seurat（V2）
+- `POST /api/seurat/inspect`
+- `POST /api/seurat/prepare-training`
+- `GET /api/seurat/prepare-training/{job_id}`
+
+### 3.4 任务
+- `GET /api/jobs`
+- `GET /api/jobs/{job_id}`
+- `GET /api/jobs/{job_id}/log`
+- `POST /api/jobs/train`
+- `POST /api/jobs/predict`
+
+### 3.5 结果
+- `GET /api/results`
+- `GET /api/results/{result_id}`
+- `GET /api/results/job/{job_id}`
+- `GET /api/results/models/list`
+- `GET /api/results/models/{model_id}`
+- `GET /api/results/{result_id}/assets/{asset_name}`
+
+详细接口请看：`docs/api/seurat.md`（Seurat 部分），其余接口可参考 `backend/app/api/*.py`。
+
+---
+
+## 4. 本地开发启动（推荐）
+
+## 4.1 环境要求
+- Python 3.11（推荐）
+- Node.js 20+
+- R + SeuratDisk（仅 `.rds/.h5seurat -> h5ad` 转换需要）
+
+## 4.2 后端启动
 
 ```bash
-pip install Squidiff
+pip install -r requirements.txt -r backend/requirements.txt
+uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 3.2 Local Development (Recommended) / 本地开发（推荐）
-
-#### 3.2.1 Clone Repository / 克隆仓库
+## 4.3 前端启动
 
 ```bash
-git clone https://github.com/siyuh/Squidiff.git
-cd Squidiff
+cd frontend
+npm install
+npm run dev
 ```
 
-#### 3.2.2 Using `uv` (Recommended) / 使用 `uv`（推荐）
+默认访问：
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:8000`
 
-**EN:** `uv` is faster and more reliable for dependency management.  
-**中文：** `uv` 更快更可靠，推荐使用。
+---
+
+## 5. Docker 部署（内网快速拉起）
+
+配置文件：`infra/docker-compose.yml`  
+示例环境变量：`infra/.env.example`
 
 ```bash
-# Install uv
-pip install uv
-
-# Create virtual environment
-uv venv
-
-# Activate (Windows)
-.venv\Scripts\activate
-# Activate (Linux/macOS)
-source .venv/bin/activate
-
-# Install dependencies (with Chinese mirror for faster download)
-uv pip install --index-url https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
-uv pip install --index-url https://pypi.tuna.tsinghua.edu.cn/simple -e ".[dev]"
-
-# Install PyTorch with CUDA (REQUIRED - CPU version not supported)
-# Check CUDA version first: nvidia-smi
-uv pip install --index-url https://download.pytorch.org/whl/cu118 torch torchvision torchaudio
+cd infra
+cp .env.example .env
+docker compose up --build
 ```
 
-#### 3.2.3 Using `pip` / 使用 `pip`
+### 5.1 关键环境变量
 
-```bash
-# Create virtual environment
-# Windows
-python -m venv .venv
-# Linux/macOS
-python3 -m venv .venv
-
-# Activate
-# Windows
-.venv\Scripts\activate
-# Linux/macOS
-source .venv/bin/activate
-
-# Install dependencies (with Chinese mirror)
-pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
-pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e ".[dev]"
-
-# Install PyTorch with CUDA (REQUIRED)
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-```
-
-**EN:** ⚠️ **Important**: Squidiff requires GPU training. You MUST install CUDA version of PyTorch, not CPU version.  
-**中文：** ⚠️ **重要**：Squidiff 训练需要 GPU，必须安装 CUDA 版本的 PyTorch，不能使用 CPU 版本。
-
-## 4. Data Requirements / 数据要求
-
-**EN:** Input format is `h5ad` (`AnnData`).  
-**中文：** 输入格式为 `h5ad`（`AnnData`）。  
-
-| Field | Required | EN | 中文 |
-|---|---|---|---|
-| `adata.X` | Yes | Cell-by-gene expression matrix | 细胞 x 基因表达矩阵 |
-| `adata.obs["Group"]` | Yes | Group/condition label | 分组或条件标签 |
-| `adata.obs["SMILES"]` | Conditional | Required when `use_drug_structure=True` | 当 `use_drug_structure=True` 时必需 |
-| `adata.obs["dose"]` | Conditional | Required when `use_drug_structure=True` | 当 `use_drug_structure=True` 时必需 |
-
-## 5. Quick Start / 快速开始
-
-### 5.1 Check Input Shape / 检查输入维度
-
-```bash
-python scripts/check_shape.py --data_path path/to/train.h5ad
-```
-
-**EN:** Use reported gene count for both `--gene_size` and `--output_dim`.  
-**中文：** 将输出的基因数同时用于 `--gene_size` 与 `--output_dim`。  
-
-### 5.2 Train Baseline Model / 训练基础模型
-
-```bash
-python train_squidiff.py \
-  --logger_path "./results/baseline" \
-  --data_path "path/to/train.h5ad" \
-  --resume_checkpoint "./checkpoints/baseline" \
-  --gene_size 159 \
-  --output_dim 159
-```
-
-### 5.3 Train with Drug Structure / 使用药物结构训练
-
-```bash
-python train_squidiff.py \
-  --logger_path "./results/drug" \
-  --data_path "path/to/train.h5ad" \
-  --control_data_path "path/to/control.h5ad" \
-  --resume_checkpoint "./checkpoints/drug" \
-  --use_drug_structure True \
-  --gene_size 159 \
-  --output_dim 159
-```
-
-### 5.4 Inference / 推理
-
-```python
-import torch
-import scanpy as sc
-import sample_squidiff
-
-sampler = sample_squidiff.sampler(
-    model_path="checkpoints/baseline/model.pt",
-    gene_size=159,
-    output_dim=159,
-    use_drug_structure=False,
-)
-
-test_adata = sc.read_h5ad("path/to/test.h5ad")
-z_sem = sampler.model.encoder(torch.tensor(test_adata.X).to("cuda"))
-pred = sampler.pred(z_sem, gene_size=test_adata.shape[1])
-```
-
-## 6. Key Training Arguments / 核心训练参数
-
-| Argument | EN | 中文 |
+| 变量 | 说明 | 默认值 |
 |---|---|---|
-| `--logger_path` | Output directory for logs/checkpoints | 日志与检查点输出目录 |
-| `--data_path` | Training dataset path (`h5ad`) | 训练数据路径（`h5ad`） |
-| `--resume_checkpoint` | Resume/save checkpoint location | 恢复/保存检查点位置 |
-| `--gene_size` | Input gene dimension | 输入基因维度 |
-| `--output_dim` | Output dimension (usually same as `gene_size`) | 输出维度（通常与 `gene_size` 相同） |
-| `--use_drug_structure` | Enable drug-structure conditioning | 开启药物结构条件建模 |
-| `--control_data_path` | Control dataset for drug-structure mode | 药物结构模式下的对照组数据路径 |
-| `--batch_size` | Training batch size | 训练批大小 |
-| `--lr` | Learning rate | 学习率 |
+| `LABFLOW_DRY_RUN` | 后端是否走轻量 dry-run | `true` |
+| `LABFLOW_R_EXEC_MODE` | R 执行模式（`direct`/`cmd_conda`） | `direct` |
+| `LABFLOW_RSCRIPT_BIN` | Rscript 命令 | `Rscript` |
+| `LABFLOW_R_CONDA_ENV` | `cmd_conda` 下的 Conda 环境名 | 空 |
+| `LABFLOW_R_CONDA_BAT` | `conda.bat` 路径 | `conda.bat` |
+| `VITE_API_BASE` | 前端请求后端地址 | `http://localhost:8000` |
 
-## 7. Documentation Map / 文档导航
+---
 
-- **EN:** Deployment + environment + training operations: `docs/部署文档.md`  
-  **中文：** 部署、环境、训练运行文档：`docs/部署文档.md`  
-- **EN:** Seurat to h5ad conversion and data validation: `docs/seurat转换指南.md`  
-  **中文：** Seurat 转换与数据校验文档：`docs/seurat转换指南.md`  
-- **EN:** Troubleshooting checklist and common errors: `docs/避坑指南.md`  
-  **中文：** 排错清单与常见错误：`docs/避坑指南.md`  
+## 6. 开发/运维常用命令
 
-## 8. Quality Check / 质量检查
-
+### 6.1 后端静态检查
 ```bash
-python -m ruff check .
+ruff check backend/app backend/tests
+ruff format --check backend/app backend/tests
 ```
 
-## 9. Reproducibility / 复现资源
-
-**EN:** Additional end-to-end resources are available at:  
-**中文：** 更多端到端复现资源请见：  
-
-- https://github.com/siyuh/Squidiff_reproducibility
-
-## 10. Citation / 引用
-
-```bibtex
-@article{he2025squidiff,
-  title={Squidiff: predicting cellular development and responses to perturbations using a diffusion model},
-  author={He, Siyu and Zhu, Yitan and Tavakol, Diana N and others},
-  journal={Nature Methods},
-  year={2025},
-  doi={10.1038/s41592-025-02877-y}
-}
+### 6.2 前端检查与构建
+```bash
+cd frontend
+npm run lint
+npm run build
 ```
 
-## 11. Contact / 联系方式
+### 6.3 训练输入形状检查
+```bash
+python scripts/check_shape.py --data_path path/to/data.h5ad
+```
 
-- Siyu He: siyuhe@stanford.edu
-- GitHub Issues: https://github.com/siyuh/Squidiff/issues
+### 6.4 Phase 4 UAT（至少 2 数据集）
+```bash
+python scripts/uat_phase4_seurat_v2.py \
+  --base-url http://localhost:8000 \
+  --dataset-id <A> \
+  --dataset-id <B> \
+  --group-column sample \
+  --cluster-column celltype \
+  --selected-clusters T,B,NK \
+  --seed 42
+```
 
-## 12. License / 许可证
+---
 
-**EN:** Released under the MIT License.  
-**中文：** 本项目采用 MIT 许可证。  
+## 7. 目录结构（简版）
+
+```text
+.
+├─ backend/
+│  ├─ app/
+│  │  ├─ api/
+│  │  ├─ services/
+│  │  └─ storage/
+│  ├─ state/
+│  ├─ uploads/
+│  ├─ artifacts/
+│  └─ scripts/seurat_to_h5ad.R
+├─ frontend/
+│  └─ src/
+├─ infra/
+├─ docs/
+├─ scripts/
+├─ train_squidiff.py
+└─ sample_squidiff.py
+```
+
+---
+
+## 8. 文档导航
+
+- 部署与环境：`docs/部署文档.md`
+- Seurat 转换（含 V2 补充）：`docs/seurat转换指南.md`
+- Seurat API：`docs/api/seurat.md`
+- 10 分钟上手：`docs/实验室10分钟上手.md`
+- UAT 清单：`docs/UAT_Seurat_V2_检查清单.md`
+- 设计/需求：`docs/PRD_Seurat交互筛选与500x500训练管线.md`
+
+---
+
+## 9. 当前状态与注意事项
+
+- V2 Phase 1~4 代码和交付文档已落地（inspect / prepare-training / train 默认 prepared dataset / UAT 资产）。
+- 状态存储当前是 JSON 文件方案（MVP 取舍），不等同于数据库事务一致性。
+- Seurat 转换依赖本机/容器内 R 运行时与 SeuratDisk 可用。
+- 若你在本地开发，建议优先 `LABFLOW_DRY_RUN=true` 验证链路，再切真实训练。
+
+---
+
+## 10. 许可证与引用
+
+- License: MIT（见 `LICENSE`）
+- 论文引用见仓库根目录历史信息（`README` 旧版与论文条目）。

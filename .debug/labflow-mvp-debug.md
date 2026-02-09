@@ -22,6 +22,10 @@
 - `backend/tests/test_dataset_preprocessor.py`
 - `backend/tests/test_jobs_api.py`
 - `docs/api/seurat.md`
+- `docs/seurat转换指南.md`
+- `docs/实验室10分钟上手.md`
+- `docs/UAT_Seurat_V2_检查清单.md`
+- `scripts/uat_phase4_seurat_v2.py`
 - `infra/docker-compose.yml`
 - Dependency modules:
 - `train_squidiff.py`
@@ -242,6 +246,56 @@
 - Impact assessment
 - Phase 3 core requirement is now met: train flow defaults to prepared dataset when available and source is visible in UI.
 - Remaining items are mainly Phase 4 docs/UAT and richer交互筛选体验优化.
+
+### [2026-02-10 03:xx] V2 Phase 4 implementation: docs completion + UAT delivery assets
+- Problem
+- Need to complete Phase 4 deliverables: V2 docs supplement, lab quickstart, and UAT script/checklist for at least two datasets.
+- Root cause
+- Existing docs covered base conversion and API but lacked a consolidated lab handoff package for V2 workflow and repeatable UAT execution.
+- Solution
+- Added V2 chapter to conversion guide (`docs/seurat转换指南.md`) with metadata规范、500x500约束、V2接口顺序与快速自检示例。
+- Added lab handoff doc (`docs/实验室10分钟上手.md`) with practical timeline-oriented steps.
+- Added executable UAT runner (`scripts/uat_phase4_seurat_v2.py`) supporting:
+- repeated `--dataset-id` inputs (minimum two),
+- inspect + prepare + optional train chain verification,
+- bounded checks (`n_cells <= 500`, `n_genes <= 500`),
+- JSON report output.
+- Added checklist template (`docs/UAT_Seurat_V2_检查清单.md`) for manual acceptance tracking.
+- Code changes (files/functions)
+- `docs/seurat转换指南.md` (new V2 section)
+- `docs/实验室10分钟上手.md` (new)
+- `docs/UAT_Seurat_V2_检查清单.md` (new)
+- `scripts/uat_phase4_seurat_v2.py` (`request_json`, `run_dataset_uat`, `poll_train_job_until_done`, CLI args)
+- Verification results
+- `python -m py_compile scripts/uat_phase4_seurat_v2.py`: passed.
+- `ruff check scripts/uat_phase4_seurat_v2.py`: passed.
+- `ruff format --check scripts/uat_phase4_seurat_v2.py`: passed.
+- Impact assessment
+- Phase 4 required delivery assets are now in repo and runnable.
+- Lab members can run scripted UAT with two dataset IDs and archive JSON reports for handoff.
+
+### [2026-02-10 03:xx] Documentation refresh: README + AGENTS + CLAUDE comprehensive rewrite
+- Problem
+- Need a complete, up-to-date project handbook covering front-end/back-end development, deployment, architecture, and feature status in one place.
+- Root cause
+- Existing top-level docs had partial overlap and outdated context (especially around V2 pipeline and local_Squidiff collaboration conventions).
+- Solution
+- Rewrote `README.md` as primary operator/developer entry:
+- project capabilities, architecture, API map, local runbook, docker deployment, env vars, and doc index.
+- Rewrote `AGENTS.md` as collaboration contract:
+- layer boundaries, API-first workflow, module/API quick map, checkfix rules, doc sync rules, and skill trigger guidance.
+- Rewrote `CLAUDE.md` as AI dev guide:
+- current stack, backend/frontend architecture, V2 flow, quality gates, deployment and known constraints.
+- Code changes (files/functions)
+- `README.md` (full rewrite)
+- `AGENTS.md` (full rewrite)
+- `CLAUDE.md` (full rewrite)
+- Verification results
+- Documentation consistency scan passed:
+- key API paths (`/api/seurat/prepare-training`, `/api/jobs/train`) and deployment commands are correctly reflected.
+- Per user request, no runtime tests/checkfix were executed in this round (testing deferred to next day).
+- Impact assessment
+- New contributors and AI agents can now onboard with a single coherent set of docs for architecture, deployment and workflow expectations.
 
 ## Open Issues
 - Real-world Seurat conversion relies on local R/SeuratDisk availability.
