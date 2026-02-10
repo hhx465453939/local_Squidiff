@@ -99,19 +99,19 @@ SquidiffRunner -> train_squidiff.py / sample_squidiff.py
 - `POST /api/datasets/upload`
 - `POST /api/datasets/{dataset_id}/validate`
 
-### 3.3 Seurat（V2）
+### 4.3 Seurat（V2）
 - `POST /api/seurat/inspect`
 - `POST /api/seurat/prepare-training`
 - `GET /api/seurat/prepare-training/{job_id}`
 
-### 3.4 任务
+### 4.4 任务
 - `GET /api/jobs`
 - `GET /api/jobs/{job_id}`
 - `GET /api/jobs/{job_id}/log`
 - `POST /api/jobs/train`
 - `POST /api/jobs/predict`
 
-### 3.5 结果
+### 4.5 结果
 - `GET /api/results`
 - `GET /api/results/{result_id}`
 - `GET /api/results/job/{job_id}`
@@ -123,21 +123,21 @@ SquidiffRunner -> train_squidiff.py / sample_squidiff.py
 
 ---
 
-## 4. 本地开发启动（推荐）
+## 5. 本地开发启动（推荐）
 
-## 4.1 环境要求
+### 5.1 环境要求
 - Python 3.11（推荐）
 - Node.js 20+
 - R + SeuratDisk（仅 `.rds/.h5seurat -> h5ad` 转换需要）
 
-## 4.2 后端启动
+### 5.2 后端启动
 
 ```bash
 pip install -r requirements.txt -r backend/requirements.txt
 uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## 4.3 前端启动
+### 5.3 前端启动
 
 ```bash
 cd frontend
@@ -151,7 +151,7 @@ npm run dev
 
 ---
 
-## 5. Docker 部署（内网快速拉起）
+## 6. Docker 部署（内网快速拉起）
 
 配置文件：`infra/docker-compose.yml`  
 示例环境变量：`infra/.env.example`
@@ -162,7 +162,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-### 5.1 关键环境变量
+### 6.1 关键环境变量
 
 | 变量 | 说明 | 默认值 |
 |---|---|---|
@@ -175,27 +175,27 @@ docker compose up --build
 
 ---
 
-## 6. 开发/运维常用命令
+## 7. 开发/运维常用命令
 
-### 6.1 后端静态检查
+### 7.1 后端静态检查
 ```bash
 ruff check backend/app backend/tests
 ruff format --check backend/app backend/tests
 ```
 
-### 6.2 前端检查与构建
+### 7.2 前端检查与构建
 ```bash
 cd frontend
 npm run lint
 npm run build
 ```
 
-### 6.3 训练输入形状检查
+### 7.3 训练输入形状检查
 ```bash
 python scripts/check_shape.py --data_path path/to/data.h5ad
 ```
 
-### 6.4 Phase 4 UAT（至少 2 数据集）
+### 7.4 Phase 4 UAT（至少 2 数据集）
 ```bash
 python scripts/uat_phase4_seurat_v2.py \
   --base-url http://localhost:8000 \
@@ -209,7 +209,7 @@ python scripts/uat_phase4_seurat_v2.py \
 
 ---
 
-## 7. 目录结构（简版）
+## 8. 目录结构（简版）
 
 ```text
 .
@@ -233,7 +233,7 @@ python scripts/uat_phase4_seurat_v2.py \
 
 ---
 
-## 8. 文档导航
+## 9. 文档导航
 
 - **模型能做什么与前端设计理念**：`docs/模型能做什么与前端设计理念.md`（论文依据、训练前后能力、前端根本目标与设计原则）
 - 部署与环境：`docs/部署文档.md`
@@ -245,7 +245,7 @@ python scripts/uat_phase4_seurat_v2.py \
 
 ---
 
-## 9. 当前状态与注意事项
+## 10. 当前状态与注意事项
 
 - V2 Phase 1~4 代码和交付文档已落地（inspect / prepare-training / train 默认 prepared dataset / UAT 资产）。
 - 状态存储当前是 JSON 文件方案（MVP 取舍），不等同于数据库事务一致性。
@@ -254,7 +254,7 @@ python scripts/uat_phase4_seurat_v2.py \
 
 ---
 
-## 10. 许可证与引用
+## 11. 许可证与引用
 
 - License: MIT（见 `LICENSE`）
 - 论文引用见仓库根目录历史信息（`README` 旧版与论文条目）。
