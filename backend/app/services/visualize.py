@@ -3,9 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.decomposition import PCA
 
 
 def _safe_matrix(x: np.ndarray) -> np.ndarray:
@@ -19,6 +17,22 @@ def generate_visual_assets(
     prediction_matrix: np.ndarray,
     output_dir: Path,
 ) -> dict[str, object]:
+    try:
+        import matplotlib.pyplot as plt
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "matplotlib is required to generate visualization assets. "
+            "Please install matplotlib or disable visualization generation."
+        ) from exc
+
+    try:
+        from sklearn.decomposition import PCA
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "scikit-learn is required to generate visualization assets. "
+            "Please install scikit-learn or disable visualization generation."
+        ) from exc
+
     output_dir.mkdir(parents=True, exist_ok=True)
     matrix = _safe_matrix(prediction_matrix)
 

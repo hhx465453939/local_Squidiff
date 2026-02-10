@@ -36,5 +36,5 @@ def on_shutdown() -> None:
 
 
 @app.get("/api/health")
-def health() -> dict[str, str]:
+async def health() -> dict[str, str]:
     return {"status": "ok"}

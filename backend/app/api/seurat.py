@@ -49,7 +49,7 @@ def _require_h5ad_path(dataset: dict[str, object]) -> Path:
 
 
 @router.post("/inspect")
-def inspect_seurat(payload: SeuratInspectPayload) -> dict[str, object]:
+async def inspect_seurat(payload: SeuratInspectPayload) -> dict[str, object]:
     dataset = _require_dataset(payload.dataset_id)
     h5ad_path = _require_h5ad_path(dataset)
 
@@ -70,7 +70,9 @@ def inspect_seurat(payload: SeuratInspectPayload) -> dict[str, object]:
 
 
 @router.post("/prepare-training")
-def prepare_training(payload: SeuratPrepareTrainingPayload) -> dict[str, object]:
+async def prepare_training(
+    payload: SeuratPrepareTrainingPayload,
+) -> dict[str, object]:
     dataset = _require_dataset(payload.dataset_id)
     h5ad_path = _require_h5ad_path(dataset)
 
@@ -169,7 +171,7 @@ def prepare_training(payload: SeuratPrepareTrainingPayload) -> dict[str, object]
 
 
 @router.get("/prepare-training/{job_id}")
-def get_prepare_training_job(job_id: str) -> dict[str, object]:
+async def get_prepare_training_job(job_id: str) -> dict[str, object]:
     job = store.get_seurat_prepare_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Prepare-training job not found")

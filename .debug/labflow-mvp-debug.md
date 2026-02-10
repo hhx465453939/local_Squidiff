@@ -32,7 +32,7 @@
 - `sample_squidiff.py`
 
 ## Runtime Context and Test Rules
-- Runtime environment: Local Windows (PowerShell workspace `E:\Development\local_Squidiff`)
+- Runtime environment: WSL2 Ubuntu 22.04 (local shell in `/mnt/e/Development/local_Squidiff`)
 - SSH mode (if remote): Not used in this implementation round
 - Remote project path (if remote): N/A
 - Validation/Checkfix execution mode: Run commands directly in local shell
@@ -198,6 +198,39 @@
 - deterministic/bounded sampling tests.
 - `backend/tests/test_seurat_api.py`
 - prepare-training endpoint contract tests (error + success path with stubbed preprocessor).
+
+### [2026-02-10 09:xx] WSL2 API simulation + dependency blockers
+- Problem
+- Need to run full API flow (upload/validate/inspect/prepare/train) using `data/coTC.rds` in WSL2.
+- Root cause
+- Backend could not boot without `python-multipart`, and sync FastAPI endpoints hung due to `anyio.to_thread.run_sync` in this environment.
+- Solution
+- Added multipart availability guard with `/api/datasets/register-local` for local-path testing.
+- Converted API endpoints to `async def` to avoid anyio threadpool hangs under WSL2.
+- Added explicit Rscript preflight check with clearer error message.
+- Code changes (files/functions)
+- `backend/app/api/datasets.py` (multipart guard + `register-local`; async endpoints)
+- `backend/app/api/jobs.py` (async endpoints)
+- `backend/app/api/results.py` (async endpoints)
+- `backend/app/api/seurat.py` (async endpoints)
+- `backend/app/main.py` (async health endpoint)
+- `backend/app/services/seurat_converter.py` (Rscript availability check)
+- `backend/app/services/visualize.py` (lazy imports for matplotlib/sklearn)
+- `docs/api/datasets.md` (new API doc)
+- Verification results
+- ASGI smoke test via `httpx.AsyncClient`:
+- `GET /api/health` -> 200 OK.
+- `POST /api/datasets/register-local` -> 200 OK.
+- `POST /api/datasets/{id}/validate` -> 400 with clear Rscript missing message.
+- Checkfix:
+- `ruff check backend/app backend/tests` -> passed.
+- `ruff format --check backend/app backend/tests` -> passed (after formatting).
+- Blockers
+- `Rscript` not installed in WSL2, so `.rds` conversion fails.
+- `scanpy` not installed, so `.h5ad` validation/inspect/prepare will fail after conversion.
+- `python-multipart` cannot be installed due to offline pip, so multipart upload is disabled in this environment.
+- Impact assessment
+- API is usable in WSL2 for non-multipart endpoints; full Seurat pipeline requires R + SeuratDisk + scanpy installed.
 - `docs/api/seurat.md`
 - Phase 2 endpoints and payload/response docs.
 - Verification results

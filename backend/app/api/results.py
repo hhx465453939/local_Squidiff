@@ -39,12 +39,12 @@ def _with_asset_urls(result: dict[str, object]) -> dict[str, object]:
 
 
 @router.get("")
-def list_results() -> dict[str, object]:
+async def list_results() -> dict[str, object]:
     return {"items": [_with_asset_urls(item) for item in store.list_results()]}
 
 
 @router.get("/{result_id}")
-def get_result(result_id: str) -> dict[str, object]:
+async def get_result(result_id: str) -> dict[str, object]:
     result = store.get_result(result_id)
     if result is None:
         raise HTTPException(status_code=404, detail="Result not found")
@@ -52,7 +52,7 @@ def get_result(result_id: str) -> dict[str, object]:
 
 
 @router.get("/job/{job_id}")
-def get_result_by_job(job_id: str) -> dict[str, object]:
+async def get_result_by_job(job_id: str) -> dict[str, object]:
     for result in store.list_results():
         if result.get("job_id") == job_id:
             return {"result": _with_asset_urls(result)}
@@ -60,12 +60,12 @@ def get_result_by_job(job_id: str) -> dict[str, object]:
 
 
 @router.get("/models/list")
-def list_models() -> dict[str, object]:
+async def list_models() -> dict[str, object]:
     return {"items": store.list_models()}
 
 
 @router.get("/models/{model_id}")
-def get_model(model_id: str) -> dict[str, object]:
+async def get_model(model_id: str) -> dict[str, object]:
     model = store.get_model(model_id)
     if model is None:
         raise HTTPException(status_code=404, detail="Model not found")
@@ -87,7 +87,7 @@ def _validate_asset_path(result: dict[str, object], file_path: Path) -> Path:
 
 
 @router.get("/{result_id}/assets/{asset_name}")
-def get_result_asset(result_id: str, asset_name: str) -> FileResponse:
+async def get_result_asset(result_id: str, asset_name: str) -> FileResponse:
     result = store.get_result(result_id)
     if result is None:
         raise HTTPException(status_code=404, detail="Result not found")

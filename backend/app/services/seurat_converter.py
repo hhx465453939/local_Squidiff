@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -35,6 +36,12 @@ def _build_r_command(
             f'&& "{rscript}" "{script_path}" "{input_path}" "{output_path}"'
         )
         return ["cmd", "/c", cmdline]
+
+    if shutil.which(rscript) is None and not Path(rscript).exists():
+        raise RuntimeError(
+            "Rscript was not found. Please install R and ensure Rscript is in PATH, "
+            "or set LABFLOW_RSCRIPT_BIN / rscript_bin to the full path."
+        )
 
     return [
         rscript,
