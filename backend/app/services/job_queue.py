@@ -96,7 +96,15 @@ class JobQueue:
             ) or control_dataset.get("path_raw")
 
         job_dir = settings.artifact_dir / "jobs" / job_id
-        train_out = self.runner.run_train(job_dir=job_dir, params=params)
+
+        def on_train_start(pid: int) -> None:
+            self.store.update_job(job_id, {"train_pid": pid})
+
+        train_out = self.runner.run_train(
+            job_dir=job_dir,
+            params=params,
+            on_start=on_train_start,
+        )
         model_record = self.store.create_model(
             {
                 "job_id": job_id,

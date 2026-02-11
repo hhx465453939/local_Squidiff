@@ -46,6 +46,7 @@
 - **训练失败 ModuleNotFoundError: rdkit**：当 `use_drug_structure=False` 时，Squidiff 不需 rdkit。已在 `Squidiff/scrna_datasets.py` 中将 rdkit 改为在 `Drug_dose_encoder` 内按需导入，避免无药物结构时因缺 rdkit 导致训练启动失败。训练失败时后端会在 job 的 error_msg 及 train.log 中保留子进程 stderr 末尾，便于排查。
 - **训练 use_drug_structure 被误传为 True**：runner 原先传 `--use_drug_structure str(False)` 即 `"False"`，argparse 解析为 True，导致脚本去读空的 control_data_path 报 OSError。已改为仅当 `params["use_drug_structure"]` 为真时才追加 `--use_drug_structure True` 与 `--control_data_path`，否则不传，使用 train_squidiff 默认 False。失败时若子进程无 stderr/stdout，则从已写入的 train.log 读末尾作为错误详情。
 - **训练轮询超时但显卡仍在跑**：脚本原为固定 3600s 超时，训练超过 1 小时即报错，而 GPU 仍在训练。已在全流程脚本中增加「超时后多侧面判断」：(1) nvidia-smi 查 GPU 利用率，高于阈值则延长；(2) nvidia-smi 进程列表（--query-compute-apps 或 -q 解析）中若存在名称含 python 的进程，也视为训练可能仍在跑并延长。任一满足即延长等待（每次 30 分钟，总上限 4 小时）。环境变量：LABFLOW_TRAIN_GPU_BUSY_THRESHOLD、LABFLOW_TRAIN_EXTEND_SEC、LABFLOW_TRAIN_MAX_TOTAL_SEC。
+- **训练轮询按本任务 PID 判断（精确到进程）**：不再仅看「是否有 python 在 GPU」，改为优先看**本任务训练进程**是否仍在 GPU。后端在启动训练子进程时用 Popen 获得 PID，通过 on_start(pid) 回调写入 job 的 train_pid；GET /api/jobs/{job_id} 返回该字段。脚本增加 get_gpu_pids()（nvidia-smi --query-compute-apps=pid 或 -q 解析 Process ID），超时后若 job 含 train_pid，则**仅当 train_pid in get_gpu_pids()** 时才延长；否则退化为「利用率或任意 Python 在 GPU」。这样其它程序占用 GPU 不会误触发延长。
 
 ## Context Network
 - File layout
@@ -386,6 +387,22 @@
 - `ruff check` 通过。
 - Impact assessment
 - 无 rdkit 环境下 use_drug_structure=False 的训练可正常启动；后续若训练仍失败，错误信息会直接包含子进程输出，无需单独查 train.log。
+
+### [2026-02-11] 训练轮询按本任务 PID 判断是否延长
+- Problem
+- 用户指出「nvidia-smi 进程列表中是否含 python 不够」，其它程序也可能用 GPU，应具体到**本脚本/本任务对应的训练进程**（进程号或路径）再判断是否延长。
+- Root cause
+- 脚本仅用「GPU 利用率 > 阈值」或「任意 Python 进程在 GPU」判断，易在多人/多任务共享 GPU 时误判。
+- Solution
+- 后端：`squidiff_runner.run_train` 改为用 `subprocess.Popen` 启动训练，得到子进程 PID 后通过新增参数 `on_start(pid)` 回调；`job_queue._execute_train` 在调用 run_train 时传入 `on_start=lambda pid: store.update_job(job_id, {"train_pid": pid})`，使 GET /api/jobs/{job_id} 返回 train_pid。脚本：新增 `get_gpu_pids()`（nvidia-smi --query-compute-apps=pid 及 -q 下 Process ID 解析），超时后先拉取 job；若存在 train_pid，则仅当 `train_pid in get_gpu_pids()` 时延长；否则退化为原逻辑（利用率或任意 Python 在 GPU）。延长/不延长时的提示改为「本任务训练进程 PID=xxx 仍在/已不在 GPU」。
+- Code changes (files/functions)
+- `backend/app/services/squidiff_runner.py`（run_train 增加 on_start，Popen + communicate 替代 run）
+- `backend/app/services/job_queue.py`（_execute_train 传入 on_train_start 写 train_pid）
+- `scripts/run_full_train_predict_viz_windows.py`（get_gpu_pids、轮询分支按 train_pid 判断延长）
+- Verification results
+- ruff check 通过；无新增 lint 报错。
+- Impact assessment
+- 仅在本任务训练进程（具体 PID）仍占用 GPU 时延长等待，其它程序占用 GPU 不会触发延长。
 
 ## Open Issues
 - Real-world Seurat conversion relies on local R/SeuratDisk availability.

@@ -4,7 +4,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
@@ -23,7 +23,13 @@ class SquidiffRunner:
             if not content.endswith("\n"):
                 handle.write("\n")
 
-    def run_train(self, *, job_dir: Path, params: dict[str, Any]) -> dict[str, Any]:
+    def run_train(
+        self,
+        *,
+        job_dir: Path,
+        params: dict[str, Any],
+        on_start: Callable[[int], None] | None = None,
+    ) -> dict[str, Any]:
         job_dir.mkdir(parents=True, exist_ok=True)
         log_path = job_dir / "train.log"
         checkpoint_dir = job_dir / "checkpoints"
@@ -62,18 +68,21 @@ class SquidiffRunner:
             if params.get("control_data_path"):
                 cmd.extend(["--control_data_path", params["control_data_path"]])
 
-        proc = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
             cwd=str(self.repo_root),
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            check=False,
         )
-        self._write_log(log_path, proc.stdout)
-        self._write_log(log_path, proc.stderr)
+        if on_start is not None:
+            on_start(proc.pid)
+        stdout, stderr = proc.communicate()
+        self._write_log(log_path, stdout or "")
+        self._write_log(log_path, stderr or "")
 
         if proc.returncode != 0:
-            tail = (proc.stderr or "").strip() or (proc.stdout or "").strip()
+            tail = (stderr or "").strip() or (stdout or "").strip()
             if not tail and log_path.exists():
                 try:
                     tail = log_path.read_text(encoding="utf-8", errors="replace").strip()
