@@ -1,4 +1,4 @@
-# Auth API
+﻿# Auth API
 
 Lightweight intranet authentication based on local SQLite storage.
 

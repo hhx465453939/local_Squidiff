@@ -1,4 +1,4 @@
-# UAT 检查清单：Seurat V2（Phase 4）
+﻿# UAT 检查清单：Seurat V2（Phase 4）
 
 > 目标：使用至少 2 个不同 Seurat 数据集，验证 V2 流程（inspect → prepare-training → train 默认 prepared dataset）可用。
 
