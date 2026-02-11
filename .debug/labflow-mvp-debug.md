@@ -482,3 +482,34 @@ pm run lint executed.
 - Impact assessment
 - User guide endpoint is more robust; frontend now fails fast with explicit backend/network guidance instead of silent waiting behavior.
 
+
+### [2026-02-11 20:06] README 乱码修复（编码统一为 UTF-8）
+- Problem
+- README 在部分环境（如 GitHub/编辑器）显示乱码。
+- Root cause
+- README 文件编码不是 UTF-8，导致跨平台读取时解码不一致。
+- Solution
+- 将 README.md 从本地中文编码无损转换为 UTF-8（LF）。
+- Code changes (files/functions)
+- README.md（编码转换，无语义内容改动）
+- Verification results
+- Python 严格校验：README.md 可被 utf-8 成功解码。
+- 关键首行中文校验通过（含 CJK 字符）。
+- Impact assessment
+- README 在 GitHub 与 UTF-8 工具链下可稳定显示中文，不再出现乱码。
+
+
+### [2026-02-11 20:09] README 重写为中英双语（中文一行 + 英文一行）
+- Problem
+- 用户要求 README 采用中英双语排版（中文一行、英文一行），并修复历史乱码影响。
+- Root cause
+- README 之前存在编码混用与内容结构不统一，导致可读性差。
+- Solution
+- 直接重写 README.md 为统一双语结构，保留 logo、原项目致谢、安装命令与文档导航。
+- Code changes (files/functions)
+- README.md（全文重写，UTF-8）
+- Verification results
+- Python 读取校验通过：README.md 可按 UTF-8 解码，中文内容存在。
+- Impact assessment
+- README 对中文/英文读者更友好，且避免跨环境乱码问题。
+

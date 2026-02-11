@@ -1,366 +1,191 @@
-﻿# Squidiff LabFlow（本仓库说明）
+# Squidiff LabFlow（本仓库说明） / Squidiff LabFlow (Repository Guide)
 
-> 这是一个“研究模型 + 内网 Web 工作流”的混合仓库。  
-> 你既可以直接用 `train_squidiff.py` / `sample_squidiff.py` 做模型训练推理，也可以用前后端 Web 流程完成 Seurat 数据上传、500x500 预处理、训练与结果查看。
+<p align="center">
+  <img src="docs/assets/labflow-logo.svg" alt="Squidiff LabFlow logo" width="760" />
+</p>
 
----
+<p align="center">
+  <img src="https://raw.githubusercontent.com/siyuh/Squidiff/main/squidiff_logo.png" alt="Original Squidiff logo" width="190" />
+</p>
 
-## 1. 项目目标与面向用户
-
-### 项目在解决什么问题？
-
-Squidiff 是一个**用扩散模型预测单细胞转录组变化**的工具（见 [Nature Methods 论文](https://doi.org/10.1038/s41592-025-02877-y)）。通俗说：
-
-- **训练前**：你提供单细胞数据（如 Seurat / h5ad）以及“条件”（例如不同时间点、不同药物/剂量），系统学会“在这种条件下，细胞转录组会变成什么样”。
-- **训练后**：用训练好的模型对**新样本、新条件**做**预测**，得到“模型认为的转录组”以及 UMAP、热图等结果，用来做**计算机里的虚拟实验（in silico）**，减少重复湿实验、快速筛条件、辅助发文章。
-
-典型用途包括：**细胞分化轨迹**、**基因扰动**、**药物响应预测**等（与论文中的验证场景一致）。  
-更细的“模型能做什么”和设计理念见：[`docs/模型能做什么与前端设计理念.md`](docs/模型能做什么与前端设计理念.md)。
-
-### 产品最终给谁用？
-
-**LabFlow 网页端优先面向不会写代码、不搞生信的生命科学研究者**（硕博、博后、PI 等）。目标是：
-
-- 在**不敲命令、不配环境**的前提下，通过上传数据、点选参数、查看结果，完成“数据 → 训练 → 用模型做预测 → 看图/下载”的全流程。
-- 界面和文案要让人一眼看懂：自己在做的是“用 Squidiff 预测转录组”，而不是抽象的“跑一个 AI 模型”。
-
-命令行脚本（`train_squidiff.py` / `sample_squidiff.py`）仍保留给会编程或生信的同学做复现与扩展；但**产品形态与文档以“外行友好”为第一目标**。
+> 致谢：本项目基于原始 Squidiff 工作持续扩展与工程化，感谢原作者及贡献者。  
+> Acknowledgement: This project extends and engineers the original Squidiff work. Thanks to the original authors and contributors.
+>
+> 原项目地址：<https://github.com/siyuh/Squidiff>  
+> Original project: <https://github.com/siyuh/Squidiff>
 
 ---
 
-## 1.5 Quick Start（用户视角）
+## 1. 项目定位 / Project Scope
 
-> 目标：从“刚拿到项目”到“在网页里跑通一次训练并看到结果”。  
-> 下面所有文档链接均可直接点击打开。
+本仓库是“研究脚本 + LabFlow Web 工作流”的混合仓库。  
+This repository combines research scripts and the LabFlow web workflow.
 
-### Step 0：先选一条部署路径
+你可以直接使用 `train_squidiff.py` / `sample_squidiff.py` 做训练和推理。  
+You can directly use `train_squidiff.py` / `sample_squidiff.py` for training and inference.
 
-- **本地开发（推荐第一次使用）**：按 `README` 的“5. 开发与部署（三种方式）”启动前后端，最快看到完整流程。
-- **Docker 一键部署（内网环境）**：按 [`docs/部署文档.md`](docs/部署文档.md) 执行，适合团队共享或服务器长期运行。
-- **Windows 一键启动（实验室小服务器）**：在一台 Windows 机器上按 `README` 完成部署后，参考 [`docs/Windows一键启动器.md`](docs/Windows一键启动器.md) 使用启动器或打包 `.exe`，为实验室同事提供「双击即可用」的内网入口。
-
-### Step 1：完成部署并启动服务
-
-1. 按你选择的部署方式完成环境准备。  
-2. 启动后端（默认 `http://localhost:8000`）。  
-3. 启动前端（默认 `http://localhost:5173`）。  
-4. 在浏览器打开前端地址，看到 LabFlow 页面即表示部署成功。
-
-如果你需要从 `.rds/.h5seurat` 转成 `.h5ad`，先看：[`docs/seurat转换指南.md`](docs/seurat转换指南.md)。
-
-### Step 2：按页面完成一次“上传 → 预处理 → 训练 → 查看结果”
-
-建议严格按这个顺序操作（零基础用户可直接照做）：
-
-1. **上传数据并校验**：确认文件可读、字段完整。  
-2. **Seurat inspect**：查看 metadata 列与 UMAP 预览。  
-3. **500x500 预处理**：筛选 cluster，生成训练用 prepared dataset。  
-4. **提交训练任务并轮询状态**：等待任务完成。  
-5. **查看结果资产**：模型信息、日志、图像与下载项。
-
-详细“每个按钮点哪里、每个参数怎么填”请看：  
-[`docs/LabFlow前端用户操作说明.md`](docs/LabFlow前端用户操作说明.md)
-
-### Step 3：需要快速上手或排查问题时看这些文档
-
-- **10 分钟快速走通一遍**：[`docs/实验室10分钟上手.md`](docs/实验室10分钟上手.md)
-- **Seurat 接口与数据流程**：[`docs/api/seurat.md`](docs/api/seurat.md)
-- **任务接口（train/predict/log/cancel）**：[`docs/api/jobs.md`](docs/api/jobs.md)
-- **模型与结果接口（list/download/delete）**：[`docs/api/results.md`](docs/api/results.md)
-- **数据集接口（上传/校验）**：[`docs/api/datasets.md`](docs/api/datasets.md)
-- **UAT 验收清单**：[`docs/UAT_Seurat_V2_检查清单.md`](docs/UAT_Seurat_V2_检查清单.md)
-- **产品目标与模型能力说明**：[`docs/模型能做什么与前端设计理念.md`](docs/模型能做什么与前端设计理念.md)
-- **Windows 一键启动器与 .exe 打包**：[`docs/Windows一键启动器.md`](docs/Windows一键启动器.md)
-- **常见坑位与排查**：[`docs/避坑指南.md`](docs/避坑指南.md)
-- **账号系统与 Auth API**：[`docs/api/auth.md`](docs/api/auth.md)
+你也可以通过前后端 Web 流程完成上传、校验、预处理、训练和结果查看。  
+You can also complete upload, validation, preprocessing, training, and result review through the web flow.
 
 ---
 
-## 2. 项目功能总览
+## 2. 快速开始 / Quick Start
 
-### 2.1 研究模型能力（根目录脚本）
-- 基于扩散模型的单细胞转录组预测。
-- 支持基础模式与药物结构模式（`SMILES + dose`）。
-- 入口脚本：
-  - `train_squidiff.py`
-  - `sample_squidiff.py`
+推荐顺序：上传 -> 校验 -> Seurat 检查 -> 500x500 预处理 -> 训练 -> 结果页。  
+Recommended flow: upload -> validate -> Seurat inspect -> 500x500 prepare -> train -> results.
 
-### 2.2 LabFlow Web 能力（`backend/` + `frontend/`）
-- 数据上传与格式校验（支持 `.h5ad/.rds/.h5seurat`）。
-- Seurat 检查（metadata 字段 + UMAP 预览）。
-- 训练前预处理（Phase 2）：
-  - cluster 过滤
-  - 最多 500 cells 分层抽样
-  - 最多 500 genes 筛选（Wilcoxon + fallback）
-- 训练任务提交与轮询（Phase 3）：
-  - 默认优先使用 `prepared_dataset_id`
-  - 训练来源可追溯（`source_dataset_id`、`train_dataset_id`、`prepared_dataset_id`）
-  - 支持按用户设置任务调度模式（`serial=1` 并发 / `parallel=3` 并发）
-- 结果资产查看（模型信息、预测图像、日志）。
+前端默认地址：`http://localhost:5173`。  
+Frontend default URL: `http://localhost:5173`.
+
+后端默认地址：`http://localhost:8000`。  
+Backend default URL: `http://localhost:8000`.
+
+前端用户操作说明见 `docs/LabFlow前端用户操作说明.md`。  
+See `docs/LabFlow前端用户操作说明.md` for step-by-step frontend usage.
 
 ---
 
-## 3. 当前架构（前后端 + 任务执行）
+## 3. 核心能力 / Core Capabilities
 
-```text
-Frontend (React/Vite)
-   |
-   | HTTP / JSON
-   v
-FastAPI backend
-   ├─ /api/datasets   (上传/校验/转换)
-   ├─ /api/seurat     (inspect + prepare-training)
-   ├─ /api/jobs       (train/predict + poll + log)
-   └─ /api/results    (模型/结果/资产)
-   |
-   v
-JsonStateStore (backend/state/*.json)
-   |
-   v
-JobQueue worker
-   |
-   v
-SquidiffRunner -> train_squidiff.py / sample_squidiff.py
-```
+研究脚本能力：扩散模型驱动的单细胞转录组预测。  
+Research capability: diffusion-model-driven single-cell transcriptome prediction.
 
-### 3.1 后端核心目录
-- `backend/app/api/`：REST API 路由。
-- `backend/app/services/`：业务服务层（转换、检查、预处理、任务执行）。
-- `backend/app/storage/state_manager.py`：文件型状态存储。
-- `backend/state/`：状态 JSON（`datasets/jobs/seurat_prepare_jobs/models/results`）。
-- `backend/uploads/`：上传与预处理输出。
-- `backend/artifacts/`：训练/预测任务产物与日志。
+Web 能力：上传/校验、Seurat 检查、500x500 预处理、训练任务、结果资产查看。  
+Web capability: upload/validation, Seurat inspect, 500x500 preprocessing, training jobs, and result assets.
 
-### 3.2 前端核心目录
-- `frontend/src/App.tsx`：单页流程 UI（上传 -> 校验 -> inspect -> prepare -> train -> 结果）。
-- `frontend/src/services/api.ts`：API 类型与请求封装。
-- `frontend/src/styles/tokens.css`：样式 token 与页面样式。
+任务调度支持按用户切换模式：`Serial (1)` 或 `Parallel (3)`。  
+Task scheduling supports per-user mode switching: `Serial (1)` or `Parallel (3)`.
 
 ---
 
-## 4. API 概览
+## 4. API 概览 / API Overview
 
-### 4.1 健康检查
-- `GET /api/health`
+健康检查：`GET /api/health`。  
+Health check: `GET /api/health`.
 
-### 4.2 数据集
-- `GET /api/datasets`
-- `POST /api/datasets/upload`
-- `POST /api/datasets/{dataset_id}/validate`
+数据集接口：`/api/datasets`。  
+Dataset APIs: `/api/datasets`.
 
-### 4.3 Seurat（V2）
-- `POST /api/seurat/inspect`
-- `POST /api/seurat/prepare-training`
-- `GET /api/seurat/prepare-training/{job_id}`
+Seurat 接口：`/api/seurat`。  
+Seurat APIs: `/api/seurat`.
 
-### 4.4 任务
-- `GET /api/jobs`
-- `GET /api/jobs/{job_id}`
-- `GET /api/jobs/{job_id}/log`
-- `POST /api/jobs/train`
-- `POST /api/jobs/predict`
+任务接口：`/api/jobs`。  
+Job APIs: `/api/jobs`.
 
-### 4.5 结果
-- `GET /api/results`
-- `GET /api/results/{result_id}`
-- `GET /api/results/job/{job_id}`
-- `GET /api/results/models/list`
-- `GET /api/results/models/{model_id}`
-- `GET /api/results/{result_id}/assets/{asset_name}`
+结果接口：`/api/results`。  
+Result APIs: `/api/results`.
 
-### 4.6 用户调度偏好
-- `GET /api/user-prefs/scheduler`
-- `PUT /api/user-prefs/scheduler`
-
-详细接口请看：`docs/api/seurat.md`（Seurat 部分），其余接口可参考 `backend/app/api/*.py`。
+用户调度偏好接口：`/api/user-prefs/scheduler`。  
+User scheduler preference API: `/api/user-prefs/scheduler`.
 
 ---
 
-## 5. 开发与部署（三种方式）
+## 5. 开发与部署（三选一） / Development and Deployment (Choose One)
 
-环境三选一即可：**uv**、**conda**、或**本机 Python**（venv + pip）。下面命令按 **Windows** 和 **Linux / macOS** 分开写，复制时只复制你当前系统对应的那一行或一段即可。R + SeuratDisk 仅在需要 `.rds/.h5seurat → h5ad` 转换时安装；前端需 Node.js 20+。**前端每个选项、参数怎么填**见 `docs/LabFlow前端用户操作说明.md`。
+环境可选：`uv`、`conda`、或 `venv + pip`。  
+Environment options: `uv`, `conda`, or `venv + pip`.
 
-### 5.1 环境准备（任选其一）
+先装 CUDA 版 PyTorch，再装 requirements，避免安装成 CPU 版本。  
+Install CUDA PyTorch first, then install requirements, to avoid CPU-only fallback.
 
-**uv（推荐）**
+### 5.1 uv（推荐） / uv (Recommended)
 
 ```bash
-# Windows（在 PowerShell 或 CMD 中执行）
+# Windows
 uv venv
 .venv\Scripts\activate
-# 先装 CUDA 版 PyTorch（按 nvidia-smi 结果选 cu118 或 cu121）
 uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 uv pip install -r requirements.txt -r backend/requirements.txt --extra-index-url https://download.pytorch.org/whl/cu118
 
-# Linux / macOS（在终端中执行）
+# Linux / macOS
 uv venv
 source .venv/bin/activate
-# 先装 CUDA 版 PyTorch（按 nvidia-smi 结果选 cu118 或 cu121）
 uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 uv pip install -r requirements.txt -r backend/requirements.txt --extra-index-url https://download.pytorch.org/whl/cu118
 ```
 
-**conda**
+### 5.2 conda / conda
 
 ```bash
-# Windows 与 Linux / macOS 相同
 conda create -n labflow python=3.11
 conda activate labflow
-# 先装 CUDA 版 PyTorch（按 nvidia-smi 结果选 cu118 或 cu121）
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 pip install -r requirements.txt -r backend/requirements.txt --extra-index-url https://download.pytorch.org/whl/cu118
 ```
 
-**本机 Python（venv + pip）**
+### 5.3 venv + pip / venv + pip
 
 ```bash
 # Windows
 python -m venv .venv
 .venv\Scripts\activate
-# 先装 CUDA 版 PyTorch（按 nvidia-smi 结果选 cu118 或 cu121）
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 pip install -r requirements.txt -r backend/requirements.txt --extra-index-url https://download.pytorch.org/whl/cu118
 
 # Linux / macOS
 python3 -m venv .venv
 source .venv/bin/activate
-# 先装 CUDA 版 PyTorch（按 nvidia-smi 结果选 cu118 或 cu121）
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 pip install -r requirements.txt -r backend/requirements.txt --extra-index-url https://download.pytorch.org/whl/cu118
 ```
 
-### 5.2 启动后端
-
-在项目根目录、已激活环境中执行（Windows 与 Linux / macOS 命令相同）：
+### 5.4 启动后端 / Start Backend
 
 ```bash
 python -m uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 5.3 启动前端
+### 5.5 启动前端 / Start Frontend
 
 ```bash
-# Windows（PowerShell 或 CMD）
-cd frontend
-npm install
-npm run dev
-
-# Linux / macOS
 cd frontend
 npm install
 npm run dev
 ```
-
-（若习惯一行执行：Linux/mac 与 Windows CMD 用 `cd frontend && npm install && npm run dev`；Windows PowerShell 用 `cd frontend; npm install; npm run dev`。）
-
-- 前端：`http://localhost:5173`
-- 后端：`http://localhost:8000`
-
-### 5.4 Docker（内网一键）
-
-```bash
-cd infra && cp .env.example .env && docker compose up --build
-```
-
-环境变量说明见 `infra/.env.example`，部署细节见 `docs/部署文档.md`。
 
 ---
 
-## 7. 开发/运维常用命令
+## 6. 常用检查命令 / Common Check Commands
 
-### 7.1 后端静态检查
+后端检查：  
+Backend checks:
+
 ```bash
 ruff check backend/app backend/tests
 ruff format --check backend/app backend/tests
 ```
 
-### 7.2 前端检查与构建
+前端检查：  
+Frontend checks:
+
 ```bash
 cd frontend
 npm run lint
 npm run build
 ```
 
-### 7.3 训练输入形状检查
-```bash
-python scripts/check_shape.py --data_path path/to/data.h5ad
-```
+---
 
-### 7.4 Phase 4 UAT（至少 2 数据集）
-```bash
-python scripts/uat_phase4_seurat_v2.py \
-  --base-url http://localhost:8000 \
-  --dataset-id <A> \
-  --dataset-id <B> \
-  --group-column sample \
-  --cluster-column celltype \
-  --selected-clusters T,B,NK \
-  --seed 42
-```
+## 7. 文档导航 / Documentation Map
+
+前端操作说明：`docs/LabFlow前端用户操作说明.md`。  
+Frontend user guide: `docs/LabFlow前端用户操作说明.md`.
+
+部署文档：`docs/部署文档.md`。  
+Deployment guide: `docs/部署文档.md`.
+
+Seurat 转换指南：`docs/seurat转换指南.md`。  
+Seurat conversion guide: `docs/seurat转换指南.md`.
+
+API 文档目录：`docs/api/`。  
+API docs directory: `docs/api/`.
+
+避坑指南：`docs/避坑指南.md`。  
+Troubleshooting guide: `docs/避坑指南.md`.
 
 ---
 
-## 8. 目录结构（简版）
+## 8. 许可证 / License
 
-```text
-.
-├─ backend/
-│  ├─ app/
-│  │  ├─ api/
-│  │  ├─ services/
-│  │  └─ storage/
-│  ├─ state/
-│  ├─ uploads/
-│  ├─ artifacts/
-│  └─ scripts/seurat_to_h5ad.R
-├─ frontend/
-│  └─ src/
-├─ infra/
-├─ docs/
-├─ scripts/
-├─ train_squidiff.py
-└─ sample_squidiff.py
-```
-
----
-
-## 9. 文档导航
-
-- **前端用户操作说明（推荐先看）**：[`docs/LabFlow前端用户操作说明.md`](docs/LabFlow前端用户操作说明.md) — 按页面步骤说明每个选项、参数如何填写（含 Windows Conda R 配置、校验/预处理/训练各步）
-- **模型能做什么与前端设计理念**：[`docs/模型能做什么与前端设计理念.md`](docs/模型能做什么与前端设计理念.md)（论文依据、训练前后能力、前端根本目标与设计原则）
-- 部署与环境：[`docs/部署文档.md`](docs/部署文档.md)
-- Seurat 转换（含 V2 补充）：[`docs/seurat转换指南.md`](docs/seurat转换指南.md)
-- Seurat API：[`docs/api/seurat.md`](docs/api/seurat.md)
-- Datasets API：[`docs/api/datasets.md`](docs/api/datasets.md)
-- Jobs API：[`docs/api/jobs.md`](docs/api/jobs.md)
-- User Prefs API：[`docs/api/user_prefs.md`](docs/api/user_prefs.md)
-- Auth API：[`docs/api/auth.md`](docs/api/auth.md)
-- 10 分钟上手：[`docs/实验室10分钟上手.md`](docs/实验室10分钟上手.md)
-- Windows 一键启动器：[`docs/Windows一键启动器.md`](docs/Windows一键启动器.md)
-- 避坑指南：[`docs/避坑指南.md`](docs/避坑指南.md)
-- 设计/需求：[`docs/PRD_Seurat交互筛选与500x500训练管线.md`](docs/PRD_Seurat交互筛选与500x500训练管线.md)
-
----
-
-## 10. 当前状态与注意事项
-
-- V2 Phase 1~4 代码和交付文档已落地（inspect / prepare-training / train 默认 prepared dataset / UAT 资产）。
-- 状态存储当前是 JSON 文件方案（MVP 取舍），不等同于数据库事务一致性。
-- Seurat 转换依赖本机/容器内 R 运行时与 SeuratDisk 可用。
-- 若你在本地开发，建议优先 `LABFLOW_DRY_RUN=true` 验证链路，再切真实训练。
-
----
-
-## 11. 许可证与引用
-
-- License: MIT（见 `LICENSE`）
-- 论文引用见仓库根目录历史信息（`README` 旧版与论文条目）。
-
-## 12. 轻量认证（首页注册/登录）
-
-LabFlow 已支持内网轻量账号系统（SQLite 本地库 + 安全哈希）。
-- 首页提供“注册/登录”，登录后可直接进入分析流程。
-- 登录成功后，前端会自动携带 `Bearer Token` 调用受保护 API。
-- 首页保留“用户说明书”入口，对应 `GET /api/auth/user-guide`。
-
-认证 API 文档：`docs/api/auth.md`
+本项目使用 MIT 许可证，详见 `LICENSE`。  
+This project is released under the MIT License. See `LICENSE`.
