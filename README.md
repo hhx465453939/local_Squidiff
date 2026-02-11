@@ -183,12 +183,16 @@ SquidiffRunner -> train_squidiff.py / sample_squidiff.py
 # Windows（在 PowerShell 或 CMD 中执行）
 uv venv
 .venv\Scripts\activate
-uv pip install -r requirements.txt -r backend/requirements.txt
+# 先装 CUDA 版 PyTorch（按 nvidia-smi 结果选 cu118 或 cu121）
+uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+uv pip install -r requirements.txt -r backend/requirements.txt --extra-index-url https://download.pytorch.org/whl/cu118
 
 # Linux / macOS（在终端中执行）
 uv venv
 source .venv/bin/activate
-uv pip install -r requirements.txt -r backend/requirements.txt
+# 先装 CUDA 版 PyTorch（按 nvidia-smi 结果选 cu118 或 cu121）
+uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+uv pip install -r requirements.txt -r backend/requirements.txt --extra-index-url https://download.pytorch.org/whl/cu118
 ```
 
 **conda**
@@ -197,7 +201,9 @@ uv pip install -r requirements.txt -r backend/requirements.txt
 # Windows 与 Linux / macOS 相同
 conda create -n labflow python=3.11
 conda activate labflow
-pip install -r requirements.txt -r backend/requirements.txt
+# 先装 CUDA 版 PyTorch（按 nvidia-smi 结果选 cu118 或 cu121）
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+pip install -r requirements.txt -r backend/requirements.txt --extra-index-url https://download.pytorch.org/whl/cu118
 ```
 
 **本机 Python（venv + pip）**
@@ -206,12 +212,16 @@ pip install -r requirements.txt -r backend/requirements.txt
 # Windows
 python -m venv .venv
 .venv\Scripts\activate
-pip install -r requirements.txt -r backend/requirements.txt
+# 先装 CUDA 版 PyTorch（按 nvidia-smi 结果选 cu118 或 cu121）
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+pip install -r requirements.txt -r backend/requirements.txt --extra-index-url https://download.pytorch.org/whl/cu118
 
 # Linux / macOS
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt -r backend/requirements.txt
+# 先装 CUDA 版 PyTorch（按 nvidia-smi 结果选 cu118 或 cu121）
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+pip install -r requirements.txt -r backend/requirements.txt --extra-index-url https://download.pytorch.org/whl/cu118
 ```
 
 ### 5.2 启动后端
