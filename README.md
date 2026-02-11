@@ -125,7 +125,7 @@ SquidiffRunner -> train_squidiff.py / sample_squidiff.py
 
 ## 5. 开发与部署（三种方式）
 
-环境三选一即可：**uv**、**conda**、或**本机 Python**（venv + pip）。下面命令按 **Windows** 和 **Linux / macOS** 分开写，复制时只复制你当前系统对应的那一行或一段即可。R + SeuratDisk 仅在需要 `.rds/.h5seurat → h5ad` 转换时安装；前端需 Node.js 20+。
+环境三选一即可：**uv**、**conda**、或**本机 Python**（venv + pip）。下面命令按 **Windows** 和 **Linux / macOS** 分开写，复制时只复制你当前系统对应的那一行或一段即可。R + SeuratDisk 仅在需要 `.rds/.h5seurat → h5ad` 转换时安装；前端需 Node.js 20+。**前端每个选项、参数怎么填**见 `docs/LabFlow前端用户操作说明.md`。
 
 ### 5.1 环境准备（任选其一）
 
@@ -263,6 +263,7 @@ python scripts/uat_phase4_seurat_v2.py \
 
 ## 9. 文档导航
 
+- **前端用户操作说明（推荐先看）**：`docs/LabFlow前端用户操作说明.md` — 按页面步骤说明每个选项、参数如何填写（含 Windows Conda R 配置、校验/预处理/训练各步）
 - **模型能做什么与前端设计理念**：`docs/模型能做什么与前端设计理念.md`（论文依据、训练前后能力、前端根本目标与设计原则）
 - 部署与环境：`docs/部署文档.md`
 - Seurat 转换（含 V2 补充）：`docs/seurat转换指南.md`
