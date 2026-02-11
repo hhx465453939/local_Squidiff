@@ -1,4 +1,4 @@
-# Seurat 转换指南（R -> h5ad）
+﻿# Seurat 转换指南（R -> h5ad）
 
 > 目标：将 Seurat 对象转换为 Squidiff 可直接使用的 `h5ad`，并完成最小验证。
 

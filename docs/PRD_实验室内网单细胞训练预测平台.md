@@ -1,4 +1,4 @@
-# Squidiff LabFlow（MVP）: 技术规范与 AI 指令
+﻿# Squidiff LabFlow（MVP）: 技术规范与 AI 指令
 
 ## 1. 需求审计总结（含缺失信息）
 

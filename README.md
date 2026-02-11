@@ -1,4 +1,4 @@
-﻿# Squidiff LabFlow（本仓库说明）
+# Squidiff LabFlow（本仓库说明）
 
 > 这是一个“研究模型 + 内网 Web 工作流”的混合仓库。  
 > 你既可以直接用 `train_squidiff.py` / `sample_squidiff.py` 做模型训练推理，也可以用前后端 Web 流程完成 Seurat 数据上传、500x500 预处理、训练与结果查看。
@@ -15,7 +15,7 @@ Squidiff 是一个**用扩散模型预测单细胞转录组变化**的工具（�
 - **训练后**：用训练好的模型对**新样本、新条件**做**预测**，得到“模型认为的转录组”以及 UMAP、热图等结果，用来做**计算机里的虚拟实验（in silico）**，减少重复湿实验、快速筛条件、辅助发文章。
 
 典型用途包括：**细胞分化轨迹**、**基因扰动**、**药物响应预测**等（与论文中的验证场景一致）。  
-更细的“模型能做什么”和设计理念见：`docs/模型能做什么与前端设计理念.md`。
+更细的“模型能做什么”和设计理念见：[`docs/模型能做什么与前端设计理念.md`](docs/模型能做什么与前端设计理念.md)。
 
 ### 产品最终给谁用？
 
@@ -37,6 +37,7 @@ Squidiff 是一个**用扩散模型预测单细胞转录组变化**的工具（�
 
 - **本地开发（推荐第一次使用）**：按 `README` 的“5. 开发与部署（三种方式）”启动前后端，最快看到完整流程。
 - **Docker 一键部署（内网环境）**：按 [`docs/部署文档.md`](docs/部署文档.md) 执行，适合团队共享或服务器长期运行。
+- **Windows 一键启动（实验室小服务器）**：在一台 Windows 机器上按 `README` 完成部署后，参考 [`docs/Windows一键启动器.md`](docs/Windows一键启动器.md) 使用启动器或打包 `.exe`，为实验室同事提供「双击即可用」的内网入口。
 
 ### Step 1：完成部署并启动服务
 
@@ -68,6 +69,9 @@ Squidiff 是一个**用扩散模型预测单细胞转录组变化**的工具（�
 - **数据集接口（上传/校验）**：[`docs/api/datasets.md`](docs/api/datasets.md)
 - **UAT 验收清单**：[`docs/UAT_Seurat_V2_检查清单.md`](docs/UAT_Seurat_V2_检查清单.md)
 - **产品目标与模型能力说明**：[`docs/模型能做什么与前端设计理念.md`](docs/模型能做什么与前端设计理念.md)
+- **Windows 一键启动器与 .exe 打包**：[`docs/Windows一键启动器.md`](docs/Windows一键启动器.md)
+- **常见坑位与排查**：[`docs/避坑指南.md`](docs/避坑指南.md)
+- **账号系统与 Auth API**：[`docs/api/auth.md`](docs/api/auth.md)
 
 ---
 
@@ -306,14 +310,18 @@ python scripts/uat_phase4_seurat_v2.py \
 
 ## 9. 文档导航
 
-- **前端用户操作说明（推荐先看）**：`docs/LabFlow前端用户操作说明.md` — 按页面步骤说明每个选项、参数如何填写（含 Windows Conda R 配置、校验/预处理/训练各步）
-- **模型能做什么与前端设计理念**：`docs/模型能做什么与前端设计理念.md`（论文依据、训练前后能力、前端根本目标与设计原则）
-- 部署与环境：`docs/部署文档.md`
-- Seurat 转换（含 V2 补充）：`docs/seurat转换指南.md`
-- Seurat API：`docs/api/seurat.md`
-- 10 分钟上手：`docs/实验室10分钟上手.md`
-- UAT 清单：`docs/UAT_Seurat_V2_检查清单.md`
-- 设计/需求：`docs/PRD_Seurat交互筛选与500x500训练管线.md`
+- **前端用户操作说明（推荐先看）**：[`docs/LabFlow前端用户操作说明.md`](docs/LabFlow前端用户操作说明.md) — 按页面步骤说明每个选项、参数如何填写（含 Windows Conda R 配置、校验/预处理/训练各步）
+- **模型能做什么与前端设计理念**：[`docs/模型能做什么与前端设计理念.md`](docs/模型能做什么与前端设计理念.md)（论文依据、训练前后能力、前端根本目标与设计原则）
+- 部署与环境：[`docs/部署文档.md`](docs/部署文档.md)
+- Seurat 转换（含 V2 补充）：[`docs/seurat转换指南.md`](docs/seurat转换指南.md)
+- Seurat API：[`docs/api/seurat.md`](docs/api/seurat.md)
+- Datasets API：[`docs/api/datasets.md`](docs/api/datasets.md)
+- Jobs API：[`docs/api/jobs.md`](docs/api/jobs.md)
+- Auth API：[`docs/api/auth.md`](docs/api/auth.md)
+- 10 分钟上手：[`docs/实验室10分钟上手.md`](docs/实验室10分钟上手.md)
+- Windows 一键启动器：[`docs/Windows一键启动器.md`](docs/Windows一键启动器.md)
+- 避坑指南：[`docs/避坑指南.md`](docs/避坑指南.md)
+- 设计/需求：[`docs/PRD_Seurat交互筛选与500x500训练管线.md`](docs/PRD_Seurat交互筛选与500x500训练管线.md)
 
 ---
 
