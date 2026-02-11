@@ -652,12 +652,12 @@ export function App() {
                       <strong>{selectedMetadataColumn}</strong> 的取值（共{" "}
                       {(seuratInspect.metadata_column_values?.[selectedMetadataColumn]?.length ??
                         0)}{" "}
-                      个）：
+                      个分类）：
                       <div className="chip-list metadata-values-list">
                         {(seuratInspect.metadata_column_values?.[selectedMetadataColumn] ?? []).map(
-                          (value) => (
-                            <code key={value} className="value-chip">
-                              {value}
+                          (item) => (
+                            <code key={item.value} className="value-chip" title={`${item.value}: ${item.count} 个细胞`}>
+                              {item.value} <span className="value-count">({item.count})</span>
                             </code>
                           )
                         )}

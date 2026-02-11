@@ -23,8 +23,11 @@ export type SeuratInspectReport = {
   n_cells: number;
   n_genes: number;
   metadata_columns: string[];
-  /** 每列的唯一取值，便于点击标签查看分类（如 celltype 下有哪些类型） */
-  metadata_column_values?: Record<string, string[]>;
+  /** 每列的唯一取值及计数（类似 R table()），便于点击标签查看分类（如 celltype 下有哪些类型及细胞数） */
+  metadata_column_values?: Record<
+    string,
+    Array<{ value: string; count: number }>
+  >;
   has_umap: boolean;
   umap?: {
     key: string;

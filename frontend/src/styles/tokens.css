@@ -272,6 +272,15 @@ code {
 .metadata-values-list .value-chip {
   font-size: 0.85rem;
   padding: 0.2rem 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.metadata-values-list .value-count {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.9em;
 }
 
 .hint {

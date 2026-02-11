@@ -32,3 +32,13 @@
   3. **接入**：在 `App.tsx` 每个对应表单项的 label 文字后插入 `<ParamTooltip text={PARAM_TOOLTIPS["…"]} />`（或 `.gene_size` 等）。
 - **样式**：`tokens.css` 新增 `.param-tooltip-wrap`、`.param-tooltip-trigger`（圆形灰底「?」、hover 时 accent 色）、`.param-tooltip-bubble`（absolute、深色、圆角、三角箭头）。
 - **Checkfix**：`npm run build` 通过；无新增 lint 报错。
+
+### [2026-02-11] Seurat 解析 metadata 值显示：添加细胞数统计（类似 R table()）
+- **用户需求**：点击 metadata 字段（如 celltype）后，不仅要显示有哪些分类，还要显示每个分类有多少个细胞（类似 R 的 `table()` 函数），便于用户了解数据分布。
+- **问题**：之前只返回唯一值列表，用户看到"共 0 个"，且无法知道每个分类的细胞数。
+- **方案**：
+  1. **后端**（`backend/app/services/seurat_inspector.py`）：使用 pandas Series 的 `value_counts()` 统计每个值的计数（类似 R `table()`），返回结构从 `dict[str, list[str]]` 改为 `dict[str, list[dict[str, Any]]]`，每个元素包含 `{"value": str, "count": int}`；按计数降序、值升序排序；跳过 NaN/None/空字符串。
+  2. **前端类型**（`frontend/src/services/api.ts`）：`metadata_column_values` 类型从 `Record<string, string[]>` 改为 `Record<string, Array<{ value: string; count: number }>>`。
+  3. **前端显示**（`frontend/src/App.tsx`）：在 metadata-values-list 中，每个 chip 显示 `{value} ({count})`，count 用 accent 色、加粗；hover 时 tooltip 显示完整信息。
+- **样式**：`.value-chip` 改为 `inline-flex` 支持 gap，`.value-count` 用 accent 色、加粗、稍小字号。
+- **Checkfix**：后端 `ruff check` 通过；前端 `npm run build` 通过。

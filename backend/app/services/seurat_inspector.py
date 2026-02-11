@@ -68,16 +68,27 @@ def inspect_h5ad(data_path: Path, umap_preview_limit: int = 1500) -> dict[str, o
     obs = getattr(adata, "obs", None)
 
     metadata_columns: list[str] = []
-    metadata_column_values: dict[str, list[str]] = {}
+    metadata_column_values: dict[str, list[dict[str, Any]]] = {}
     if obs is not None and hasattr(obs, "columns"):
         metadata_columns = sorted(str(name) for name in obs.columns.tolist())
         max_values_per_column = 200
         for col in metadata_columns:
             try:
                 series = obs[col]
-                uniq = series.astype(str).dropna().unique().tolist()
-                uniq = sorted(set(uniq))[:max_values_per_column]
-                metadata_column_values[col] = uniq
+                # 使用 value_counts() 统计每个值的细胞数（类似 R 的 table()）
+                value_counts = series.astype(str).value_counts()
+                # 转换为列表，每个元素包含 value 和 count
+                values_with_counts: list[dict[str, Any]] = []
+                for value, count in value_counts.items():
+                    value_str = str(value)
+                    # 跳过 NaN、None、空字符串
+                    if value_str.lower() in ("nan", "none", "nat", "") or value_str == "<NA>":
+                        continue
+                    values_with_counts.append({"value": value_str, "count": int(count)})
+                # 按计数降序排序，然后按值排序（便于查看）
+                values_with_counts.sort(key=lambda x: (-x["count"], x["value"]))
+                # 限制数量
+                metadata_column_values[col] = values_with_counts[:max_values_per_column]
             except Exception:  # noqa: BLE001
                 metadata_column_values[col] = []
 
