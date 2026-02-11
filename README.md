@@ -132,7 +132,7 @@ pip install -r requirements.txt -r backend/requirements.txt --extra-index-url ht
 ### 5.4 启动后端 / Start Backend
 
 ```bash
-python -m uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+uv run python -m uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 5.5 启动前端 / Start Frontend

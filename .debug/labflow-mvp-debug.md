@@ -513,3 +513,29 @@ pm run lint executed.
 - Impact assessment
 - README 对中文/英文读者更友好，且避免跨环境乱码问题。
 
+
+### [2026-02-11 20:35] Launcher switched to uv-run backend + Windows packaging command fix
+- Problem
+- Running `python labflow_launcher.py` started backend with `python -m uvicorn ...` from Anaconda base, which failed with `No module named uvicorn`.
+- Running `pyinstaller ...` also failed because `pyinstaller.exe` was installed in user Scripts but not on PATH.
+- Root cause
+- Launcher backend command was hardcoded to interpreter-local uvicorn module (`python -m uvicorn`) instead of uv-managed execution.
+- Packaging docs used `pyinstaller` executable directly, which is PATH-sensitive on Windows.
+- Solution
+- Changed launcher backend startup command to `uv run python -m uvicorn backend.app.main:app ...`.
+- Added `LABFLOW_UV` support to allow full-path uv binary when uv is not on PATH.
+- Updated docs to use `python -m PyInstaller ...` for stable packaging on Windows.
+- Updated README and deployment docs backend start command to uv-run style for consistency.
+- Code changes (files/functions)
+- `labflow_launcher.py` (`LauncherConfig`, `detect_uv_command`, `build_backend_cmd`, startup config in `main`)
+- `README.md` (backend startup command)
+- `docs/部署文档.md` (backend startup command + auth example)
+- `docs/Windows一键启动器.md` (backend command, packaging command, troubleshooting, LABFLOW_UV env)
+- Verification results
+- `python -m py_compile labflow_launcher.py`: passed.
+- `python labflow_launcher.py --dry-run`: now fails fast with clear uv guidance in current shell (`Missing command uv ... set LABFLOW_UV`).
+- `python -m ruff ...`: blocked in current environment (`No module named ruff`).
+- Impact assessment
+- Launcher no longer depends on base-conda uvicorn availability and follows uv-first workflow.
+- Windows packaging instructions no longer depend on PATH containing `pyinstaller.exe`.
+- Remaining prerequisite: uv must be available via PATH or `LABFLOW_UV`.

@@ -17,7 +17,7 @@
 `labflow_launcher.py` / `LabFlowLauncher.exe` 会：
 
 1. 自动定位项目根目录（支持脚本运行和 EXE 运行）。
-2. 启动后端：`uvicorn backend.app.main:app --host 0.0.0.0 --port 8000`。
+2. 启动后端：`uv run python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000`。
 3. 启动前端：
 - 默认 `preview` 模式（适合服务器长期运行）。
 - 启动命令：`npm run preview -- --host 0.0.0.0 --port 5173 --strictPort`。
@@ -61,7 +61,7 @@ python labflow_launcher.py --dry-run
 
 ```powershell
 pip install pyinstaller
-pyinstaller --onefile --name LabFlowLauncher labflow_launcher.py
+python -m PyInstaller --onefile --name LabFlowLauncher labflow_launcher.py
 ```
 
 输出文件：
@@ -111,7 +111,7 @@ python labflow_launcher.py `
 ### 7.2 环境变量
 
 - `LABFLOW_PROJECT_ROOT`：项目根目录
-- `LABFLOW_PYTHON`：指定 Python 可执行文件
+- `LABFLOW_UV`：指定 `uv` 可执行文件（当 `uv` 不在 PATH 时）
 - `LABFLOW_HOST`：监听地址（默认 `0.0.0.0`）
 - `LABFLOW_BACKEND_PORT`：后端端口（默认 `8000`）
 - `LABFLOW_FRONTEND_PORT`：前端端口（默认 `5173`）
@@ -130,11 +130,17 @@ python labflow_launcher.py `
 2. 启动器提示找不到 npm
 - 安装 Node.js 并确认 `npm -v` 可用。
 
-3. EXE 提示找不到项目根目录
+3. 启动器提示找不到 `uv`
+- 安装 uv 并确认 `uv --version` 可用，或设置 `LABFLOW_UV` 为完整路径（例如 `C:\Users\<用户名>\AppData\Roaming\Python\Python312\Scripts\uv.exe`）。
+
+4. PowerShell 提示 `pyinstaller` 不是命令
+- 使用模块方式执行：`python -m PyInstaller --onefile --name LabFlowLauncher labflow_launcher.py`。
+
+5. EXE 提示找不到项目根目录
 - 把 EXE 放到项目根目录，或设置 `LABFLOW_PROJECT_ROOT`。
 
-4. 内网用户无法访问
+6. 内网用户无法访问
 - 检查服务器 IP、端口、防火墙规则。
 
-5. 需要调试前端热更新
+7. 需要调试前端热更新
 - 改用 `--frontend-mode dev`（只建议开发时）。

@@ -31,7 +31,7 @@ WINDOWS = os.name == "nt"
 @dataclass(frozen=True)
 class LauncherConfig:
     project_root: Path
-    python_cmd: str
+    uv_cmd: str
     host: str
     backend_port: int
     frontend_port: int
@@ -107,32 +107,27 @@ def _command_exists(command: str) -> bool:
     return shutil.which(command) is not None
 
 
-def detect_python_command() -> str:
-    env_cmd = os.getenv("LABFLOW_PYTHON")
-    if env_cmd:
-        if not _command_exists(env_cmd):
-            raise RuntimeError(
-                f"LABFLOW_PYTHON is set but command does not exist: {env_cmd}"
-            )
-        return env_cmd
-
-    if not getattr(sys, "frozen", False):
-        current = sys.executable
-        if _command_exists(current):
-            return current
-
-    if _command_exists("python"):
-        return "python"
-
-    raise RuntimeError(
-        "Python command not found. Install Python or set LABFLOW_PYTHON to a full path."
-    )
-
-
 def require_command(command: str, hint: str) -> None:
     if _command_exists(command):
         return
     raise RuntimeError(f"Missing command `{command}`. {hint}")
+
+
+def detect_uv_command() -> str:
+    env_cmd = os.getenv("LABFLOW_UV")
+    if env_cmd:
+        if not _command_exists(env_cmd):
+            raise RuntimeError(
+                f"LABFLOW_UV is set but command does not exist: {env_cmd}"
+            )
+        return env_cmd
+
+    if _command_exists("uv"):
+        return "uv"
+
+    raise RuntimeError(
+        "Missing command `uv`. Install uv, add it to PATH, or set LABFLOW_UV."
+    )
 
 
 def get_local_ip() -> str:
@@ -243,7 +238,9 @@ def prepare_frontend_if_needed(config: LauncherConfig) -> None:
 
 def build_backend_cmd(config: LauncherConfig) -> list[str]:
     cmd = [
-        config.python_cmd,
+        config.uv_cmd,
+        "run",
+        "python",
         "-m",
         "uvicorn",
         "backend.app.main:app",
@@ -339,11 +336,11 @@ def main() -> int:
         ensure_project_layout(project_root)
 
         require_command("npm", "Install Node.js and ensure npm is in PATH.")
-        python_cmd = detect_python_command()
+        uv_cmd = detect_uv_command()
 
         config = LauncherConfig(
             project_root=project_root,
-            python_cmd=python_cmd,
+            uv_cmd=uv_cmd,
             host=args.host,
             backend_port=args.backend_port,
             frontend_port=args.frontend_port,
