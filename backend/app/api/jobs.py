@@ -6,9 +6,10 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from ..auth import require_auth
 from ..core.config import settings
 from ..runtime import job_queue, store
 
@@ -334,7 +335,10 @@ async def flush_jobs(
 
 
 @router.post("/train")
-async def submit_train_job(payload: TrainJobPayload) -> dict[str, object]:
+async def submit_train_job(
+    payload: TrainJobPayload,
+    current_user: dict[str, object] | None = Depends(require_auth),
+) -> dict[str, object]:
     dataset = store.get_dataset(payload.dataset_id)
     if dataset is None:
         raise HTTPException(status_code=404, detail="Dataset not found")
@@ -384,6 +388,7 @@ async def submit_train_job(payload: TrainJobPayload) -> dict[str, object]:
             "type": "train",
             "status": "queued",
             "dataset_id": train_dataset["id"],
+            "owner_user_id": int(current_user["id"]) if current_user else None,
             "source_dataset_id": source_dataset_id,
             "prepared_dataset_id": prepared_dataset_id,
             "used_prepared_dataset": used_prepared_dataset,
@@ -398,7 +403,10 @@ async def submit_train_job(payload: TrainJobPayload) -> dict[str, object]:
 
 
 @router.post("/predict")
-async def submit_predict_job(payload: PredictJobPayload) -> dict[str, object]:
+async def submit_predict_job(
+    payload: PredictJobPayload,
+    current_user: dict[str, object] | None = Depends(require_auth),
+) -> dict[str, object]:
     dataset = store.get_dataset(payload.dataset_id)
     if dataset is None:
         raise HTTPException(status_code=404, detail="Dataset not found")
@@ -413,6 +421,7 @@ async def submit_predict_job(payload: PredictJobPayload) -> dict[str, object]:
             "type": "predict",
             "status": "queued",
             "dataset_id": payload.dataset_id,
+            "owner_user_id": int(current_user["id"]) if current_user else None,
             "params": payload.model_dump(),
             "error_msg": None,
             "started_at": None,

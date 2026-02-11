@@ -439,3 +439,46 @@
 - Impact assessment
 - Reduces risk of accidental CPU-only PyTorch installation in backend setup; keeps deploy guidance consistent across docs.
 
+
+### [2026-02-11 19:32] Per-user scheduler mode (serial/parallel) with default parallel cap=3
+- Problem
+- Existing queue model was effectively single-thread serial; users needed a simple per-user switch between serial and parallel behavior without admin console complexity.
+- Root cause
+- JobQueue had a single worker and no user-level concurrency policy; no user preference API existed.
+- Solution
+- Added per-user scheduler preference API (`/api/user-prefs/scheduler`) backed by SQLite (`user_prefs` table), stored `owner_user_id` on submitted jobs, and refactored JobQueue into multi-worker scheduling with per-user limits: serial=1, parallel=3.
+- Code changes (files/functions)
+- `backend/app/services/auth_service.py` (user_prefs schema + get/set scheduler mode)
+- `backend/app/api/user_prefs.py` (new API)
+- `backend/app/api/jobs.py` (persist owner_user_id)
+- `backend/app/services/job_queue.py` (multi-worker dispatcher + per-user slot control)
+- `backend/app/main.py` + `backend/app/runtime.py` (router/runtime wiring)
+- `frontend/src/services/api.ts` + `frontend/src/App.tsx` (scheduler mode UI + API integration)
+- `docs/api/jobs.md` + `docs/api/user_prefs.md` + `docs/LabFlow前端用户操作说明.md` + `docs/部署文档.md` + `README.md`
+- `backend/tests/test_user_prefs_api.py` (new tests)
+- Verification results
+- `python -m compileall backend/app` passed.
+- `python -m pytest ...` blocked in current environment (`ModuleNotFoundError: fastapi`).
+- `ruff` blocked (ruff not installed in current environment).
+- `npm run lint` executed; `npm run build` blocked by host permission issue (`spawn EPERM`).
+- Impact assessment
+- Each logged-in user can now choose task scheduling mode in Task Center: serial(1) or parallel(3). Queue dispatch is user-isolated by owner_user_id; changing mode affects scheduling immediately for queued tasks.
+
+### [2026-02-11 19:53] Auth guide unreachable + login click appears unresponsive (network/error clarity hardening)
+- Problem
+- User reported /api/auth/user-guide打不开 and login actions seemed to have no response in frontend.
+- Root cause
+- Two risk points were identified: (1) guide file discovery could hit non-target markdown and fail hard in render path; (2) frontend fetch lacked timeout and explicit backend-unreachable messaging, so network stalls looked like no-op.
+- Solution
+- Backend: guide path now prefers docs/LabFlow前端用户操作说明.md; render failure falls back to raw markdown response.
+- Frontend: added request timeout (15s) and normalized network error message (Cannot reach backend API ...) for auth/upload/general API calls.
+- Code changes (files/functions)
+- ackend/app/api/auth.py (_find_user_guide_path, user_guide)
+- rontend/src/services/api.ts (etchWithTimeout, 	oNetworkError, requestJson/uploadDataset callsites)
+- Verification results
+- 
+pm run lint executed.
+- Direct network probe to http://192.168.1.104:8000/* from current environment timed out (indicates backend/network reachability issue in this execution context).
+- Impact assessment
+- User guide endpoint is more robust; frontend now fails fast with explicit backend/network guidance instead of silent waiting behavior.
+

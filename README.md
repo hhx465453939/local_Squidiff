@@ -95,6 +95,7 @@ Squidiff 是一个**用扩散模型预测单细胞转录组变化**的工具（�
 - 训练任务提交与轮询（Phase 3）：
   - 默认优先使用 `prepared_dataset_id`
   - 训练来源可追溯（`source_dataset_id`、`train_dataset_id`、`prepared_dataset_id`）
+  - 支持按用户设置任务调度模式（`serial=1` 并发 / `parallel=3` 并发）
 - 结果资产查看（模型信息、预测图像、日志）。
 
 ---
@@ -166,6 +167,10 @@ SquidiffRunner -> train_squidiff.py / sample_squidiff.py
 - `GET /api/results/models/list`
 - `GET /api/results/models/{model_id}`
 - `GET /api/results/{result_id}/assets/{asset_name}`
+
+### 4.6 用户调度偏好
+- `GET /api/user-prefs/scheduler`
+- `PUT /api/user-prefs/scheduler`
 
 详细接口请看：`docs/api/seurat.md`（Seurat 部分），其余接口可参考 `backend/app/api/*.py`。
 
@@ -328,6 +333,7 @@ python scripts/uat_phase4_seurat_v2.py \
 - Seurat API：[`docs/api/seurat.md`](docs/api/seurat.md)
 - Datasets API：[`docs/api/datasets.md`](docs/api/datasets.md)
 - Jobs API：[`docs/api/jobs.md`](docs/api/jobs.md)
+- User Prefs API：[`docs/api/user_prefs.md`](docs/api/user_prefs.md)
 - Auth API：[`docs/api/auth.md`](docs/api/auth.md)
 - 10 分钟上手：[`docs/实验室10分钟上手.md`](docs/实验室10分钟上手.md)
 - Windows 一键启动器：[`docs/Windows一键启动器.md`](docs/Windows一键启动器.md)

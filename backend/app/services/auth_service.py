@@ -48,6 +48,13 @@ class AuthService:
 
                 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
                 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+
+                CREATE TABLE IF NOT EXISTS user_prefs (
+                    user_id INTEGER PRIMARY KEY,
+                    scheduler_mode TEXT NOT NULL DEFAULT 'parallel',
+                    updated_at TEXT NOT NULL,
+                    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+                );
                 """
             )
 
@@ -170,3 +177,34 @@ class AuthService:
         token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
         with self._connect() as conn:
             conn.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
+
+    def get_scheduler_mode(self, user_id: int) -> str:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT scheduler_mode FROM user_prefs WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        if row is None:
+            return "parallel"
+        mode = str(row["scheduler_mode"]).strip().lower()
+        if mode not in {"serial", "parallel"}:
+            return "parallel"
+        return mode
+
+    def set_scheduler_mode(self, user_id: int, mode: str) -> str:
+        normalized = mode.strip().lower()
+        if normalized not in {"serial", "parallel"}:
+            raise ValueError("scheduler mode must be 'serial' or 'parallel'")
+        updated_at = _utc_now_iso()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO user_prefs (user_id, scheduler_mode, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    scheduler_mode=excluded.scheduler_mode,
+                    updated_at=excluded.updated_at
+                """,
+                (user_id, normalized, updated_at),
+            )
+        return normalized

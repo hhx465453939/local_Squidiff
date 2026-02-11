@@ -9,6 +9,7 @@ from .api.jobs import router as jobs_router
 from .api.results import router as results_router
 from .api.runtime import router as runtime_router
 from .api.seurat import router as seurat_router
+from .api.user_prefs import router as user_prefs_router
 from .auth import require_auth
 from .runtime import job_queue
 
@@ -28,6 +29,7 @@ app.include_router(jobs_router, dependencies=[Depends(require_auth)])
 app.include_router(results_router, dependencies=[Depends(require_auth)])
 app.include_router(runtime_router, dependencies=[Depends(require_auth)])
 app.include_router(seurat_router, dependencies=[Depends(require_auth)])
+app.include_router(user_prefs_router, dependencies=[Depends(require_auth)])
 
 
 @app.on_event("startup")

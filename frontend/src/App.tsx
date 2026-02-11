@@ -17,6 +17,7 @@ import {
   getJob,
   getJobs,
   getJobLog,
+  getSchedulerPref,
   GpuStatsResponse,
   listModels,
   listResults,
@@ -33,6 +34,7 @@ import {
   ResultRecord,
   SeuratInspectReport,
   setAuthToken,
+  updateSchedulerPref,
   uploadDataset,
   validateDataset,
   ValidationReport
@@ -141,6 +143,10 @@ export function App() {
   const [gpuStatsError, setGpuStatsError] = useState<string | null>(null);
   const [model, setModel] = useState<ModelRecord | null>(null);
   const [result, setResult] = useState<ResultRecord | null>(null);
+  const [schedulerMode, setSchedulerMode] = useState<"serial" | "parallel">("parallel");
+  const [schedulerLimit, setSchedulerLimit] = useState(3);
+  const [schedulerBusy, setSchedulerBusy] = useState(false);
+  const [schedulerError, setSchedulerError] = useState<string | null>(null);
 
   const [busyStep, setBusyStep] = useState<string | null>(null);
   const [cancelBusy, setCancelBusy] = useState(false);
@@ -325,6 +331,9 @@ export function App() {
       setLiveJobLog("");
       setGpuStats(null);
       setGpuStatsError(null);
+      setSchedulerMode("parallel");
+      setSchedulerLimit(3);
+      setSchedulerError(null);
       return;
     }
     loadJobHistory({ selectPreferred: true, showLoading: true }).catch(() => {});
@@ -343,6 +352,21 @@ export function App() {
   }, [authUser, hasEntered, job?.id, loadJobHistory]);
 
   useEffect(() => {
+    if (!authUser) {
+      return;
+    }
+    getSchedulerPref()
+      .then((pref) => {
+        setSchedulerMode(pref.mode);
+        setSchedulerLimit(pref.max_concurrent_jobs);
+        setSchedulerError(null);
+      })
+      .catch((err: unknown) => {
+        setSchedulerError(err instanceof Error ? err.message : String(err));
+      });
+  }, [authUser]);
+
+  useEffect(() => {
     if (!jobSessionKey || typeof window === "undefined") {
       return;
     }
@@ -358,6 +382,12 @@ export function App() {
     () => jobHistory.filter((item) => ACTIVE_JOB_STATUS.has(item.status)),
     [jobHistory]
   );
+  const myActiveJobsCount = useMemo(() => {
+    if (!authUser) {
+      return 0;
+    }
+    return activeJobs.filter((item) => item.owner_user_id === authUser.id).length;
+  }, [activeJobs, authUser]);
   const parsedSelectedClusters = useMemo(
     () => parseSelectedClusters(selectedClustersText),
     [selectedClustersText]
@@ -721,6 +751,20 @@ export function App() {
     await loadJobHistory({ selectPreferred: false, showLoading: true });
   }
 
+  async function onToggleSchedulerMode(mode: "serial" | "parallel") {
+    setSchedulerBusy(true);
+    setSchedulerError(null);
+    try {
+      const pref = await updateSchedulerPref(mode);
+      setSchedulerMode(pref.mode);
+      setSchedulerLimit(pref.max_concurrent_jobs);
+    } catch (err: unknown) {
+      setSchedulerError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSchedulerBusy(false);
+    }
+  }
+
   async function onFlushActiveJobs() {
     const ok = window.confirm(
       "One-click clear all queued/running tasks and related artifacts? This cannot be undone."
@@ -969,6 +1013,28 @@ export function App() {
 
         <section className="sidebar-block" aria-label="tasks">
           <h3>Jobs</h3>
+          <p className="hint">
+            My scheduler: {schedulerMode} ({myActiveJobsCount}/{schedulerLimit})
+          </p>
+          <div className="auth-tabs" role="tablist" aria-label="scheduler mode">
+            <button
+              type="button"
+              className={schedulerMode === "serial" ? "auth-tab active" : "auth-tab"}
+              onClick={() => onToggleSchedulerMode("serial")}
+              disabled={schedulerBusy}
+            >
+              Serial (1)
+            </button>
+            <button
+              type="button"
+              className={schedulerMode === "parallel" ? "auth-tab active" : "auth-tab"}
+              onClick={() => onToggleSchedulerMode("parallel")}
+              disabled={schedulerBusy}
+            >
+              Parallel (3)
+            </button>
+          </div>
+          {schedulerError ? <p className="error">{schedulerError}</p> : null}
           <div className="task-list">
             {recentJobs.length > 0 ? (
               recentJobs.map((item) => (

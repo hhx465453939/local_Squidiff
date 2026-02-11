@@ -19,6 +19,12 @@ Request JSON:
 Response:
 - `200 OK` -> `{ "job": JobRecord }`
 
+调度说明（按用户）：
+- 任务会记录 `owner_user_id`（当前登录用户 ID）。
+- 用户调度模式为 `serial` 时：个人并发上限 `1`。
+- 用户调度模式为 `parallel` 时：个人并发上限 `3`。
+- 不同用户之间并发额度互不影响。
+
 ## POST `/api/jobs/predict`
 
 提交预测任务。
@@ -48,6 +54,9 @@ Response:
 - `success`
 - `failed`
 - `canceled`
+
+`JobRecord` 额外字段：
+- `owner_user_id` (int | null)：任务所属用户 ID。
 
 ## GET `/api/jobs/{job_id}/log`
 

@@ -29,6 +29,14 @@ def _find_user_guide_path() -> Path:
     if not docs_dir.exists():
         raise HTTPException(status_code=404, detail="User guide directory not found")
 
+    preferred_files = [
+        docs_dir / "LabFlow前端用户操作说明.md",
+        docs_dir / "LabFlow用户操作说明.md",
+    ]
+    for file_path in preferred_files:
+        if file_path.exists() and file_path.is_file():
+            return file_path
+
     for pattern in ("LabFlow*.md", "*user*guide*.md", "*.md"):
         matches = sorted(docs_dir.glob(pattern))
         if matches:
@@ -500,8 +508,12 @@ async def user_guide(raw: bool = Query(default=False)) -> Response:
     if raw:
         return FileResponse(path=guide_path, media_type="text/markdown; charset=utf-8")
 
-    markdown_text = _read_markdown_text(guide_path)
-    rendered_page = _build_user_guide_html(
-        markdown_text=markdown_text, title=guide_path.stem
-    )
-    return HTMLResponse(content=rendered_page)
+    try:
+        markdown_text = _read_markdown_text(guide_path)
+        rendered_page = _build_user_guide_html(
+            markdown_text=markdown_text, title=guide_path.stem
+        )
+        return HTMLResponse(content=rendered_page)
+    except Exception:  # noqa: BLE001
+        # Fallback to raw markdown download to avoid hard-failing guide access.
+        return FileResponse(path=guide_path, media_type="text/markdown; charset=utf-8")

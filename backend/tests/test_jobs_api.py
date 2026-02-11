@@ -77,6 +77,7 @@ def test_train_job_auto_uses_latest_prepared_dataset() -> None:
     )
     assert response.status_code == 200
     job = response.json()["job"]
+    assert job["owner_user_id"] is None
     assert job["dataset_id"] == latest_prepared["id"]
     assert job["source_dataset_id"] == source["id"]
     assert job["prepared_dataset_id"] == latest_prepared["id"]

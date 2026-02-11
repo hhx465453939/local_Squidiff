@@ -14,4 +14,4 @@ auth_service = AuthService(
     db_path=Path(settings.auth_db_path),
     session_ttl_hours=settings.auth_session_ttl_hours,
 )
-job_queue = JobQueue(store=store, runner=runner)
+job_queue = JobQueue(store=store, runner=runner, auth_service=auth_service)

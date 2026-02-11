@@ -92,6 +92,7 @@ export type JobRecord = {
   type: "train" | "predict";
   status: "queued" | "running" | "success" | "failed" | "canceled";
   dataset_id: string;
+  owner_user_id?: number | null;
   source_dataset_id?: string;
   prepared_dataset_id?: string | null;
   used_prepared_dataset?: boolean;
@@ -159,8 +160,9 @@ function resolveApiBase(): string {
 
 const API_BASE = resolveApiBase();
 const AUTH_TOKEN_KEY = "labflow_auth_token";
+const REQUEST_TIMEOUT_MS = 15000;
 
-type JsonMethod = "GET" | "POST";
+type JsonMethod = "GET" | "POST" | "PUT" | "DELETE";
 
 function getAuthToken(): string | null {
   if (typeof window === "undefined") {
@@ -192,12 +194,37 @@ function buildRequestHeaders(hasJsonBody: boolean): HeadersInit | undefined {
   return Object.keys(headers).length > 0 ? headers : undefined;
 }
 
+function toNetworkError(err: unknown): Error {
+  const raw = err instanceof Error ? err.message : String(err);
+  if (/aborted|network|failed to fetch|timeout/i.test(raw)) {
+    return new Error(
+      `Cannot reach backend API at ${API_BASE}. Check backend status and network access.`
+    );
+  }
+  return err instanceof Error ? err : new Error(raw);
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (err: unknown) {
+    throw toNetworkError(err);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function requestJson<T>(
   path: string,
   method: JsonMethod = "GET",
   body?: unknown
 ): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetchWithTimeout(`${API_BASE}${path}`, {
     method,
     headers: buildRequestHeaders(body != null),
     body: body ? JSON.stringify(body) : undefined
@@ -254,7 +281,7 @@ export async function uploadDataset(input: {
   if (input.smilesFile) {
     formData.append("smiles_file", input.smilesFile);
   }
-  const response = await fetch(`${API_BASE}/api/datasets/upload`, {
+  const response = await fetchWithTimeout(`${API_BASE}/api/datasets/upload`, {
     method: "POST",
     headers: buildRequestHeaders(false),
     body: formData
@@ -458,4 +485,17 @@ export async function getCondaEnvs(condaBat?: string): Promise<CondaEnvsResponse
 
 export async function getGpuStats(): Promise<GpuStatsResponse> {
   return requestJson<GpuStatsResponse>("/api/runtime/gpu-stats");
+}
+
+export type SchedulerPref = {
+  mode: "serial" | "parallel";
+  max_concurrent_jobs: number;
+};
+
+export async function getSchedulerPref(): Promise<SchedulerPref> {
+  return requestJson<SchedulerPref>("/api/user-prefs/scheduler");
+}
+
+export async function updateSchedulerPref(mode: "serial" | "parallel"): Promise<SchedulerPref> {
+  return requestJson<SchedulerPref>("/api/user-prefs/scheduler", "PUT", { mode });
 }
