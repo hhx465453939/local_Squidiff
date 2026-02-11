@@ -1,4 +1,4 @@
-# Squidiff LabFlow（本仓库说明）
+﻿# Squidiff LabFlow（本仓库说明）
 
 > 这是一个“研究模型 + 内网 Web 工作流”的混合仓库。  
 > 你既可以直接用 `train_squidiff.py` / `sample_squidiff.py` 做模型训练推理，也可以用前后端 Web 流程完成 Seurat 数据上传、500x500 预处理、训练与结果查看。
@@ -339,11 +339,11 @@ python scripts/uat_phase4_seurat_v2.py \
 - License: MIT（见 `LICENSE`）
 - 论文引用见仓库根目录历史信息（`README` 旧版与论文条目）。
 
-## 5.5 ��ҳע��/��¼������������֤��
+## 12. 轻量认证（首页注册/登录）
 
-LabFlow ��֧�������˺�ϵͳ��SQLite ���ؿ� + ��ȫ��ϣ���룩��
-- ��ҳ��ע��/��¼���ٵ㡰��ʼ��������
-- ��¼��ǰ�˻��Զ�Я�� Bearer Token ���� API��
-- �û�˵������ڣ���ҳ���û�˵���顱��ť����� `GET /api/auth/user-guide`����
+LabFlow 已支持内网轻量账号系统（SQLite 本地库 + 安全哈希）。
+- 首页提供“注册/登录”，登录后可直接进入分析流程。
+- 登录成功后，前端会自动携带 `Bearer Token` 调用受保护 API。
+- 首页保留“用户说明书”入口，对应 `GET /api/auth/user-guide`。
 
-��� API �ĵ���`docs/api/auth.md`
+认证 API 文档：`docs/api/auth.md`
