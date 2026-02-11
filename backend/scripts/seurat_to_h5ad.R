@@ -16,12 +16,17 @@ if (grepl("\\.rds$", input_path, ignore.case = TRUE)) {
   tmp_h5seurat <- tempfile(fileext = ".h5seurat")
   SaveH5Seurat(obj, filename = tmp_h5seurat, overwrite = TRUE)
   Convert(tmp_h5seurat, dest = "h5ad", overwrite = TRUE)
-  converted <- paste0(tmp_h5seurat, ".h5ad")
-  file.copy(converted, output_path, overwrite = TRUE)
+  # SeuratDisk writes base.h5ad (replaces .h5seurat), not base.h5seurat.h5ad
+  converted <- sub("\\.h5seurat$", ".h5ad", tmp_h5seurat)
+  if (!file.copy(converted, output_path, overwrite = TRUE)) {
+    stop("file.copy failed: ", converted, " -> ", output_path)
+  }
 } else if (grepl("\\.h5seurat$", input_path, ignore.case = TRUE)) {
   Convert(input_path, dest = "h5ad", overwrite = TRUE)
-  converted <- paste0(input_path, ".h5ad")
-  file.copy(converted, output_path, overwrite = TRUE)
+  converted <- sub("\\.h5seurat$", ".h5ad", input_path)
+  if (!file.copy(converted, output_path, overwrite = TRUE)) {
+    stop("file.copy failed: ", converted, " -> ", output_path)
+  }
 } else {
   stop("Unsupported file extension. Use .rds or .h5seurat")
 }

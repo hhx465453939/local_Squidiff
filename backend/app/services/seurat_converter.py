@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 from ..core.config import settings
@@ -19,8 +20,10 @@ def _build_r_command(
     r_conda_env: str | None,
     r_conda_bat: str | None,
     rscript_bin: str | None,
-) -> list[str]:
-    """Build R invocation command with optional Windows cmd+conda activation."""
+) -> tuple[list[str], Path | None]:
+    """Build R invocation command with optional Windows cmd+conda activation.
+    Returns (argv, tmp_bat_path). If tmp_bat_path is set, caller must unlink it after run.
+    """
     exec_mode = r_exec_mode or settings.r_exec_mode
     conda_env = r_conda_env or settings.r_conda_env
     conda_bat = r_conda_bat or settings.r_conda_bat or "conda.bat"
@@ -31,11 +34,24 @@ def _build_r_command(
             raise RuntimeError(
                 "LABFLOW_R_EXEC_MODE=cmd_conda requires LABFLOW_R_CONDA_ENV"
             )
-        cmdline = (
-            f'call "{conda_bat}" activate "{conda_env}" '
-            f'&& "{rscript}" "{script_path}" "{input_path}" "{output_path}"'
+        # Windows: pass conda activation + R via a temp .bat to avoid cmd /c quoting issues.
+        # Use forward slashes for R paths so backslashes are not interpreted as escapes in R.
+        script_s = str(script_path).replace("\\", "/")
+        input_s = str(input_path).replace("\\", "/")
+        output_s = str(output_path).replace("\\", "/")
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".bat",
+            delete=False,
+            encoding="utf-8",
         )
-        return ["cmd", "/c", cmdline]
+        tmp.write(
+            f"@echo off\n"
+            f'call "{conda_bat}" activate "{conda_env}"\n'
+            f'"{rscript}" "{script_s}" "{input_s}" "{output_s}"\n'
+        )
+        tmp.close()
+        return ["cmd", "/c", tmp.name], Path(tmp.name)
 
     if shutil.which(rscript) is None and not Path(rscript).exists():
         raise RuntimeError(
@@ -48,7 +64,7 @@ def _build_r_command(
         str(script_path),
         str(input_path),
         str(output_path),
-    ]
+    ], None
 
 
 def convert_to_h5ad(
@@ -71,7 +87,7 @@ def convert_to_h5ad(
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{input_path.stem}.h5ad"
 
-    cmd = _build_r_command(
+    cmd, tmp_bat = _build_r_command(
         script_path,
         input_path,
         output_path,
@@ -80,19 +96,31 @@ def convert_to_h5ad(
         r_conda_bat=r_conda_bat,
         rscript_bin=rscript_bin,
     )
-    proc = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(
-            "Seurat conversion failed. "
-            f"cmd={' '.join(cmd)} "
-            f"stdout={proc.stdout.strip()} stderr={proc.stderr.strip()}"
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
         )
+        if proc.returncode != 0:
+            raise RuntimeError(
+                "Seurat conversion failed. "
+                f"cmd={' '.join(cmd)} "
+                f"stdout={proc.stdout.strip()} stderr={proc.stderr.strip()}"
+            )
+    finally:
+        if tmp_bat is not None and tmp_bat.exists():
+            try:
+                tmp_bat.unlink()
+            except OSError:
+                pass
 
     if not output_path.exists():
-        raise RuntimeError(f"Expected converted file not found: {output_path}")
+        extra = ""
+        if proc.stdout.strip() or proc.stderr.strip():
+            extra = f" stdout={proc.stdout.strip()!r} stderr={proc.stderr.strip()!r}"
+        raise RuntimeError(
+            f"Expected converted file not found: {output_path}. R exited 0.{extra}"
+        )
     return output_path

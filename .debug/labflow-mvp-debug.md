@@ -3,7 +3,7 @@
 ## Metadata
 - Module name: labflow-mvp
 - Created at: 2026-02-09
-- Last updated: 2026-02-10
+- Last updated: 2026-02-11
 - Related files:
 - `backend/app/main.py`
 - `backend/app/api/datasets.py`
@@ -32,12 +32,17 @@
 - `sample_squidiff.py`
 
 ## Runtime Context and Test Rules
-- Runtime environment: WSL2 Ubuntu 22.04 (local shell in `/mnt/e/Development/local_Squidiff`)
-- SSH mode (if remote): Not used in this implementation round
+- Runtime environment: **Windows 本机**（项目路径 `E:\Development\local_Squidiff`）；也可在 WSL2 下用 `/mnt/e/Development/local_Squidiff`。
+- SSH mode (if remote): Not used.
 - Remote project path (if remote): N/A
-- Validation/Checkfix execution mode: Run commands directly in local shell
-- R execution constraint (confirmed by user): R conda env must be activated via `cmd` (not PowerShell) before running `Rscript`.
+- Validation/Checkfix execution mode: 在本地 PowerShell/CMD 直接执行；Windows 下 R 须用 `cmd_conda` + `r-4.3`。
+- R execution constraint (confirmed by user): R conda env must be activated via `cmd` (not PowerShell). 推荐环境：**r-4.3**（`F:\software\Miniconda3\envs\r-4.3`），包齐全、稳定。
 - R config strategy: support both `.env` defaults (`LABFLOW_R_*`) and per-request frontend overrides (`r_exec_mode`, `r_conda_env`, `r_conda_bat`, `rscript_bin`).
+- 示例数据（data/）：**TC.rds** = 大鼠皮下筋膜针灸/痢疾 telocytes；**coTC.rds** = 大鼠结肠针灸/痢疾 telocytes；细胞量较大，用于 500×500 流程测试。
+- Windows 下 500×500 测试脚本：`scripts/run_500x500_test_windows.py`。先启动后端，再在另一终端执行 `python scripts/run_500x500_test_windows.py`；可选环境变量 `LABFLOW_BASE_URL`、`LABFLOW_R_CONDA_ENV`、`LABFLOW_R_CONDA_BAT`。
+- 全流程（转换→训练→预测→可视化报告）：`scripts/run_full_train_predict_viz_windows.py`。建议后端设置 `LABFLOW_DRY_RUN=true` 以快速跑通；报告输出到 `scripts/output/full_flow_report/`（summary.json + pca_scatter.png、heatmap_top_var_genes.png）。
+- **端口与 R 转换**：若 8000 被占用，可在其它端口启动后端并设 `LABFLOW_BASE_URL`。若 validate 报「conda.bat 不是内部或外部命令」，说明当前后端进程是旧代码，需**重启后端**以加载 R 转换的临时 .bat 修复（见 2026-02-11 Windows 全自动 500×500 测试条目）。
+- **真实训练 vs dry_run**：后端设置 `LABFLOW_DRY_RUN=true` 时，训练不执行（只写占位 `model.pt`），预测用随机矩阵，图会正常生成。要得到真实训练出的模型，需**不设或关闭** `LABFLOW_DRY_RUN` 后重启后端再跑全流程；真实模型在 `backend/artifacts/jobs/<train_job_id>/checkpoints/` 下。
 
 ## Context Network
 - File layout
@@ -329,6 +334,40 @@
 - Per user request, no runtime tests/checkfix were executed in this round (testing deferred to next day).
 - Impact assessment
 - New contributors and AI agents can now onboard with a single coherent set of docs for architecture, deployment and workflow expectations.
+
+### [2026-02-11] Windows 全自动 500×500 测试 + cmd_conda / R 转换修复
+- Problem
+- 在 Windows 本机用 data/TC.rds（筋膜）、data/coTC.rds（结肠）模拟前端 API 跑 500×500 流程时，R 转换失败：conda.bat 在 cmd /c 下无法识别；转换进程返回 0 但未生成 h5ad。
+- Root cause
+- 1) cmd /c 单行命令中路径引号被解析成可执行名的一部分；2) SeuratDisk Convert() 生成的是 base.h5ad（替换 .h5seurat），R 脚本误用 paste0(..., ".h5ad") 得到 base.h5seurat.h5ad 导致 file.copy 失败；3) 传予 R 的 Windows 反斜杠路径在 R 中被转义，改用正斜杠可避免。
+- Solution
+- 1) cmd_conda 改为通过临时 .bat 文件执行（写入 call conda activate + Rscript ...），避免 cmd /c 引号问题；2) 向 R 传入路径时统一改为正斜杠；3) 临时 .bat 用毕删除；4) R 脚本中 converted 路径改为 sub("\\.h5seurat$", ".h5ad", tmp_h5seurat)，并对 file.copy 失败做 stop()；5) 新增 scripts/run_500x500_test_windows.py，模拟 register-local → validate（cmd_conda + r-4.3）→ inspect → prepare-training（自动推断 group/cluster 列），并校验 n_cells/n_genes ≤ 500。
+- Code changes (files/functions)
+- `backend/app/services/seurat_converter.py`（临时 .bat、正斜杠路径、错误信息含 stdout/stderr）
+- `backend/scripts/seurat_to_h5ad.R`（converted 路径修正、file.copy 失败时 stop）
+- `scripts/run_500x500_test_windows.py`（新建）
+- `.debug/labflow-mvp-debug.md`（Windows 运行上下文、示例数据标注、测试脚本说明）
+- Verification results
+- 全自动测试：TC-筋膜、coTC-结肠 均完成 register → validate（R 转 h5ad）→ inspect → prepare-training，n_cells=500、n_genes=500，500×500 逻辑校验通过。
+- Checkfix：`ruff check backend/app backend/tests` 通过；`ruff format backend/app` 已执行。
+- Impact assessment
+- Windows 下使用 conda r-4.3 的 R 转换与 500×500 流程可在本机一键脚本验证；后端需安装 scanpy 以支持 inspect。
+
+### [2026-02-11] 全流程训练→预测→可视化报告脚本
+- Problem
+- 用户要求从 h5ad 转换开始到最终出可视化报告全部走通，metadata 由脚本/管线自行判断如何进入训练。
+- Root cause
+- 此前仅有 500×500 测试脚本，无训练、预测与报告拉取的一体化脚本。
+- Solution
+- 新增 `scripts/run_full_train_predict_viz_windows.py`：单条链路（默认 TC.rds）执行 register-local → validate（R 转 h5ad）→ inspect → prepare-training（500×500）→ POST /api/jobs/train（使用 prepared_dataset_id、gene_size/output_dim=500）→ 轮询训练完成 → POST /api/jobs/predict（同 prepared 数据 + 新 model_id）→ 轮询预测完成 → GET /api/results/job/{predict_job_id} → 下载 summary.assets 到 `scripts/output/full_flow_report/`（summary.json + pca_scatter.png、heatmap_top_var_genes.png）。metadata：prepared h5ad 的 .obs 已含 Group/Cluster，训练使用该 h5ad 表达矩阵（train_squidiff 不单独读 metadata）。
+- Code changes (files/functions)
+- `scripts/run_full_train_predict_viz_windows.py`（新建）
+- `.gitignore`（增加 `scripts/output/`）
+- Verification results
+- 后端 `LABFLOW_DRY_RUN=true`、端口 8002 下执行脚本：转换→prepare→train→predict→报告下载 全部成功；报告目录含 summary.json 与 2 张 PNG。
+- Checkfix：`ruff check` / `ruff format` 脚本通过。
+- Impact assessment
+- 一条命令可验证「转换→500×500→训练→预测→可视化报告」全流程；dry_run 下无需 GPU、数分钟内完成。
 
 ## Open Issues
 - Real-world Seurat conversion relies on local R/SeuratDisk availability.

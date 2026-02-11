@@ -88,6 +88,7 @@ Squidiff.egg-info/
 .pytest_cache/
 results/
 outputs/
+scripts/output/
 experiments/
 
 # Local data / model dirs（不进 git）
