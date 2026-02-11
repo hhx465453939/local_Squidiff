@@ -196,6 +196,15 @@ button {
   cursor: pointer;
 }
 
+.danger-btn {
+  border-color: #9f1d22;
+  background: #b4232a;
+}
+
+.danger-btn:hover:not(:disabled) {
+  background: #9f1d22;
+}
+
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;

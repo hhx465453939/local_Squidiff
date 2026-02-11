@@ -78,7 +78,7 @@ export type DatasetRecord = {
 export type JobRecord = {
   id: string;
   type: "train" | "predict";
-  status: "queued" | "running" | "success" | "failed";
+  status: "queued" | "running" | "success" | "failed" | "canceled";
   dataset_id: string;
   source_dataset_id?: string;
   prepared_dataset_id?: string | null;
@@ -259,6 +259,14 @@ export async function createTrainJob(input: {
 
 export async function getJob(jobId: string): Promise<JobRecord> {
   const payload = await requestJson<{ job: JobRecord }>(`/api/jobs/${jobId}`);
+  return payload.job;
+}
+
+export async function cancelJob(jobId: string): Promise<JobRecord> {
+  const payload = await requestJson<{ job: JobRecord }>(
+    `/api/jobs/${jobId}/cancel`,
+    "POST"
+  );
   return payload.job;
 }
 

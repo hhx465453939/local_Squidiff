@@ -42,3 +42,45 @@
   3. **å‰ç«¯æ˜¾ç¤º**ï¼ˆ`frontend/src/App.tsx`ï¼‰ï¼šåœ¨ metadata-values-list ä¸­ï¼Œæ¯ä¸ª chip æ˜¾ç¤º `{value} ({count})`ï¼Œcount ç”¨ accent è‰²ã€åŠ ç²—ï¼›hover æ—¶ tooltip æ˜¾ç¤ºå®Œæ•´ä¿¡æ¯ã€‚
 - **æ ·å¼**ï¼š`.value-chip` æ”¹ä¸º `inline-flex` æ”¯æŒ gapï¼Œ`.value-count` ç”¨ accent è‰²ã€åŠ ç²—ã€ç¨å°å­—å·ã€‚
 - **Checkfix**ï¼šåç«¯ `ruff check` é€šè¿‡ï¼›å‰ç«¯ `npm run build` é€šè¿‡ã€‚
+
+### [2026-02-11] ä¿®å¤ Conda R ç¯å¢ƒåä¸‹æ‹‰é€‰é¡¹ä¸æ˜¾ç¤ºçš„é—®é¢˜
+- **ç”¨æˆ·åé¦ˆ**ï¼šConda R ç¯å¢ƒååœ¨å‰ç«¯åˆ·æ–°ä¸å‡ºæ¥é€‰é¡¹ï¼Œåªèƒ½æ‰‹åŠ¨è¾“å…¥ã€‚
+- **é—®é¢˜è¯Šæ–­**ï¼š
+  1. åˆå§‹åŠ è½½æ—¶è°ƒç”¨ `getCondaEnvs()` æ— å‚æ•°ï¼Œåç«¯å¯èƒ½æ— æ³•è·å–ç¯å¢ƒåˆ—è¡¨ï¼ˆå³ä½¿æ‰¾åˆ°äº† conda.bat candidatesï¼‰
+  2. åç«¯é€»è¾‘ï¼šæ—  `conda_bat` å‚æ•°æ—¶ç”¨ç¬¬ä¸€ä¸ª candidate è·å–ç¯å¢ƒåˆ—è¡¨ï¼Œä½†å¯èƒ½æ‰§è¡Œå¤±è´¥è¿”å›ç©ºåˆ—è¡¨
+  3. æ‰‹åŠ¨è¾“å…¥ conda.bat è·¯å¾„æ—¶ï¼Œæ²¡æœ‰è‡ªåŠ¨è·å–å¯¹åº”çš„ç¯å¢ƒåˆ—è¡¨
+- **ä¿®å¤æ–¹æ¡ˆ**ï¼š
+  1. **åˆå§‹åŠ è½½ä¼˜åŒ–**ï¼šè·å–åˆ° `conda_bat_candidates` åï¼Œå¦‚æœ `conda_envs` ä¸ºç©ºï¼Œç”¨ç¬¬ä¸€ä¸ª candidate é‡æ–°è°ƒç”¨ `getCondaEnvs(firstBat)` è·å–ç¯å¢ƒåˆ—è¡¨
+  2. **æ‰‹åŠ¨è¾“å…¥å¢å¼º**ï¼šåœ¨æ‰‹åŠ¨è¾“å…¥ conda.bat è·¯å¾„çš„ `onChange` ä¸­ï¼Œå¦‚æœè¾“å…¥ä»¥ "conda.bat" ç»“å°¾ï¼Œè‡ªåŠ¨è°ƒç”¨ `getCondaEnvs()` è·å–ç¯å¢ƒåˆ—è¡¨
+- **ä»£ç **ï¼š`frontend/src/App.tsx` ç¬¬ 87-105 è¡Œï¼ˆåˆå§‹åŠ è½½ useEffectï¼‰å’Œç¬¬ 523-535 è¡Œï¼ˆæ‰‹åŠ¨è¾“å…¥ input onChangeï¼‰
+- **Checkfix**ï¼šå‰ç«¯ `npm run build` é€šè¿‡ï¼›æ—  lint é”™è¯¯ã€‚
+
+### [2026-02-11] ÑµÁ·ÈÕÖ¾ÂÖÑ¯ 404 ĞŞ¸´ + Ç°¶ËÍ£Ö¹ÑµÁ·ÈÎÎñ
+- ÓÃ»§·´À¡£º
+  1. ÑµÁ·ÔÚÅÜ£¬µ«Ç°¶Ë³ÖĞøÏÔÊ¾¡°»ñÈ¡ÈÕÖ¾Ê§°Ü¡±¡£
+  2. ĞèÒªÔÚÇ°¶ËÖ±½ÓÍ£Ö¹ÑµÁ·ÈÎÎñ¡£
+- ¸ùÒò£º
+  1. ÈÎÎñÑµÁ·½áÊøÇ°²Å»ØĞ´ `job.log_path`£¬ÂÖÑ¯ `/api/jobs/{id}/log` Ê±³£ÄÃµ½ 404¡£
+  2. ºó¶ËÈ±ÉÙÈ¡ÏûÈÎÎñ API£¬Ç°¶ËÒ²Ã»ÓĞ¡°Í£Ö¹ÈÎÎñ¡±Èë¿Ú¡£
+- ÊµÏÖ£º
+  1. ºó¶Ë `GET /api/jobs/{job_id}/log` ¸ÄÎª¡°ÈÕÖ¾Î´¾ÍĞ÷Ò²·µ»Ø 200 + ¿Õ×Ö·û´®¡±¡£
+  2. ºó¶ËĞÂÔö `POST /api/jobs/{job_id}/cancel`£ºqueued Ö±½Ó±ê¼Ç `canceled`£»running ±ê¼Ç `cancel_requested` ²¢³¢ÊÔÖÕÖ¹ÑµÁ·½ø³Ì£¨Windows ÓÃ `taskkill /T /F`£©¡£
+  3. ÈÎÎñ¶ÓÁĞÔÚÑµÁ·Æô¶¯Ç°Ô¤Ğ´ `log_path`£¬²¢ÔÚ²¶»ñµ½È¡ÏûÇëÇóÊ±½«×´Ì¬ÊÕÁ²Îª `canceled`¡£
+  4. Ç°¶ËĞÂÔö¡°Í£Ö¹ÑµÁ·ÈÎÎñ¡±°´Å¥£¨½ö queued/running ÏÔÊ¾£©£¬½ÓÈë cancel API£»ÈÕÖ¾ÂÖÑ¯Ê§°ÜÊ±²»ÔÙ·´¸´Ğ´¡°»ñÈ¡ÈÕÖ¾Ê§°Ü¡±Õ¼Î»ÎÄ°¸¡£
+- ÎÄµµÍ¬²½£º
+  1. ĞÂÔö `docs/api/jobs.md`£¨°üº¬ cancel Óë log ĞĞÎª£©¡£
+  2. ¸üĞÂ `docs/LabFlowÇ°¶ËÓÃ»§²Ù×÷ËµÃ÷.md`£¨ĞÂÔö¡°Í£Ö¹ÑµÁ·ÈÎÎñ¡±²Ù×÷ËµÃ÷£©¡£
+- Checkfix£º
+  - ´ıÖ´ĞĞ²¢»ØÌî¡£
+- Checkfix ½á¹û»ØÌî£º
+  - `python -m black . --check`£ºÊ§°Ü£¬ÌáÊ¾ 2 ¸öÎÄ¼şĞè¸ñÊ½»¯£º`backend/app/api/runtime.py`¡¢`backend/app/services/seurat_inspector.py`¡£
+  - `npm run lint`£¨frontend£©£ºÍ¨¹ı¡£
+  - `npm run build`£¨frontend£©£ºÍ¨¹ı¡£
+  - ºó¶Ë pytest£ºµ±Ç°»·¾³È±ÉÙ pytest£¨`No module named pytest`£©£»`uv run pytest` ÊÜ±¾»úÈ¨ÏŞÏŞÖÆ£¨¾Ü¾ø·ÃÎÊ£©¡£
+- [2026-02-11] Checkfix ×·¼Ó£¨code-debugger£©
+  - ÓÃ»§±¾»úÈ·ÈÏ£º`python -m black backend/app/services/seurat_inspector.py --check` Í¨¹ı¡£
+  - ÒÑÍê³É×Ô¶¯¸ñÊ½»¯ÊÕÁ²£º`backend/app/api/runtime.py`¡¢`backend/app/api/jobs.py`£¨Í³Ò»¸ñÊ½Óë»»ĞĞ£©¡£
+  - ¸´¼ìÍ¨¹ı£º
+    - `python -m black backend/app/api/runtime.py backend/app/services/seurat_inspector.py --check`
+    - `ruff format --check backend/app backend/tests`
+    - `ruff check backend/app backend/tests`

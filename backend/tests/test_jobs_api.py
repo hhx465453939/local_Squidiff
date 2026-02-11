@@ -31,6 +31,26 @@ def _create_h5ad_dataset(
     return store.create_dataset(payload)
 
 
+def _create_job(
+    *,
+    dataset_id: str,
+    status: str = "queued",
+    log_path: str | None = None,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "type": "train",
+        "status": status,
+        "dataset_id": dataset_id,
+        "params": {"gene_size": 100, "output_dim": 100},
+        "error_msg": None,
+        "started_at": None,
+        "ended_at": None,
+    }
+    if log_path is not None:
+        payload["log_path"] = log_path
+    return store.create_job(payload)
+
+
 def test_train_job_auto_uses_latest_prepared_dataset() -> None:
     source = _create_h5ad_dataset(name="source-a", path_suffix="source-a")
     _create_h5ad_dataset(
@@ -89,3 +109,25 @@ def test_train_job_rejects_mismatched_prepared_dataset() -> None:
     )
     assert response.status_code == 400
     assert "does not belong" in response.json()["detail"]
+
+
+def test_get_job_log_returns_empty_when_not_ready() -> None:
+    source = _create_h5ad_dataset(name="source-log", path_suffix="source-log")
+    job = _create_job(dataset_id=source["id"])
+
+    client = TestClient(app)
+    response = client.get(f"/api/jobs/{job['id']}/log")
+    assert response.status_code == 200
+    assert response.json() == {"log": ""}
+
+
+def test_cancel_queued_job() -> None:
+    source = _create_h5ad_dataset(name="source-cancel", path_suffix="source-cancel")
+    job = _create_job(dataset_id=source["id"], status="queued")
+
+    client = TestClient(app)
+    response = client.post(f"/api/jobs/{job['id']}/cancel")
+    assert response.status_code == 200
+    canceled = response.json()["job"]
+    assert canceled["status"] == "canceled"
+    assert canceled["error_msg"] == "Canceled by user."

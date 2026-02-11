@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ParamTooltip, PARAM_TOOLTIPS } from "./components/ParamTooltip";
 import {
   buildApiUrl,
+  cancelJob,
   createTrainJob,
   DatasetRecord,
   getCondaEnvs,
@@ -73,6 +74,7 @@ export function App() {
   const [result, setResult] = useState<ResultRecord | null>(null);
 
   const [busyStep, setBusyStep] = useState<string | null>(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
   const [selectedMetadataColumn, setSelectedMetadataColumn] = useState<string | null>(null);
 
   useEffect(() => {
@@ -87,18 +89,38 @@ export function App() {
   useEffect(() => {
     getCondaEnvs()
       .then((res) => {
-        setCondaBatCandidates(res.conda_bat_candidates);
-        setCondaEnvsList(res.conda_envs);
-        if (res.conda_bat_candidates.length > 0) {
+        const uniqueCandidates = Array.from(new Set(res.conda_bat_candidates));
+        setCondaBatCandidates(uniqueCandidates);
+        // 如果后端返回了环境列表，直接使用
+        if (res.conda_envs.length > 0) {
+          const uniqueEnvs = Array.from(new Set(res.conda_envs));
+          setCondaEnvsList(uniqueEnvs);
+          const rEnv = uniqueEnvs.find((e) => /^r[-.]?\d|r-seurat/i.test(e));
+          if (rEnv) {
+            setRCondaEnv((prev) => (prev === "" ? rEnv : prev));
+          }
+        }
+        // 如果有 conda.bat 候选但环境列表为空，用第一个 candidate 重新获取
+        if (uniqueCandidates.length > 0) {
+          const firstBat = uniqueCandidates[0];
           setRCondaBat((prev) =>
-            prev === "conda.bat" || !res.conda_bat_candidates.includes(prev)
-              ? res.conda_bat_candidates[0]
+            prev === "conda.bat" || !uniqueCandidates.includes(prev)
+              ? firstBat
               : prev
           );
-        }
-        const rEnv = res.conda_envs.find((e) => /^r[-.]?\d|r-seurat/i.test(e));
-        if (rEnv) {
-          setRCondaEnv((prev) => (prev === "" ? rEnv : prev));
+          // 如果环境列表为空，用第一个 candidate 重新获取
+          if (res.conda_envs.length === 0) {
+            getCondaEnvs(firstBat)
+              .then((res2) => {
+                const uniqueEnvs = Array.from(new Set(res2.conda_envs));
+                setCondaEnvsList(uniqueEnvs);
+                const rEnv = uniqueEnvs.find((e) => /^r[-.]?\d|r-seurat/i.test(e));
+                if (rEnv) {
+                  setRCondaEnv((prev) => (prev === "" ? rEnv : prev));
+                }
+              })
+              .catch(() => {});
+          }
         }
       })
       .catch(() => {});
@@ -118,8 +140,9 @@ export function App() {
     [clusterColumn, dataset?.path_h5ad, groupColumn, parsedSelectedClusters.length]
   );
   const canTrain = useMemo(
-    () => dataset !== null && validation?.valid === true,
-    [dataset, validation]
+    // 训练按钮放宽：校验通过 or 500×500 预处理完成 均允许开始训练
+    () => dataset !== null && (validation?.valid === true || prepareSummary !== null),
+    [dataset, prepareSummary, validation]
   );
 
   useEffect(() => {
@@ -149,7 +172,7 @@ export function App() {
     const tick = () => {
       getJobLog(jobId)
         .then(setLiveJobLog)
-        .catch(() => setLiveJobLog("（获取日志失败）"));
+        .catch(() => {});
     };
     tick();
     const interval = window.setInterval(tick, 2500);
@@ -157,7 +180,11 @@ export function App() {
   }, [job]);
 
   useEffect(() => {
-    if (job?.status !== "success" && job?.status !== "failed") {
+    if (
+      job?.status !== "success" &&
+      job?.status !== "failed" &&
+      job?.status !== "canceled"
+    ) {
       return;
     }
     getJobLog(job.id)
@@ -362,6 +389,25 @@ export function App() {
     }
   }
 
+  async function onCancelTrain() {
+    if (!job || (job.status !== "queued" && job.status !== "running")) {
+      return;
+    }
+    setCancelBusy(true);
+    setGlobalError(null);
+    try {
+      const updated = await cancelJob(job.id);
+      setJob(updated);
+      const log = await getJobLog(job.id);
+      setLiveJobLog(log);
+      setJobLog(log);
+    } catch (err: unknown) {
+      setGlobalError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCancelBusy(false);
+    }
+  }
+
   const taskLabelMap: Record<string, string> = {
     upload: "上传中…",
     validate: "校验中…",
@@ -371,6 +417,7 @@ export function App() {
   };
   const isJobRunning =
     job != null && (job.status === "queued" || job.status === "running");
+  const canCancelTrain = isJobRunning && !cancelBusy;
   const showTaskFeedback = busyStep !== null || isJobRunning;
   const taskLabel = busyStep
     ? taskLabelMap[busyStep] ?? "处理中…"
@@ -492,7 +539,9 @@ export function App() {
                       setRCondaBat("");
                     } else {
                       setRCondaBat(v);
-                      getCondaEnvs(v).then((res) => setCondaEnvsList(res.conda_envs));
+                      getCondaEnvs(v).then((res) =>
+                        setCondaEnvsList(Array.from(new Set(res.conda_envs)))
+                      );
                     }
                   }}
                 >
@@ -507,8 +556,17 @@ export function App() {
                   <input
                     value={rCondaBat}
                     onChange={(e) => {
-                      setRCondaBat(e.target.value);
+                      const newBat = e.target.value;
+                      setRCondaBat(newBat);
                       setValidateError(null);
+                      // 如果输入了有效的路径，尝试获取环境列表
+                      if (newBat.trim().length > 0 && newBat.endsWith("conda.bat")) {
+                        getCondaEnvs(newBat.trim())
+                          .then((res) =>
+                            setCondaEnvsList(Array.from(new Set(res.conda_envs)))
+                          )
+                          .catch(() => {});
+                      }
                     }}
                     placeholder="conda.bat 完整路径"
                   />
@@ -822,6 +880,13 @@ export function App() {
         <h2>6) 任务轮询状态</h2>
         {job ? (
           <div className="stack">
+            {canCancelTrain ? (
+              <div className="step-actions">
+                <button type="button" className="danger-btn" onClick={onCancelTrain}>
+                  {cancelBusy ? "停止中..." : "停止训练任务"}
+                </button>
+              </div>
+            ) : null}
             <div className="kv">
               <span>job_id</span>
               <code>{job.id}</code>
@@ -838,6 +903,9 @@ export function App() {
               <span>ended</span>
               <code>{formatTime(job.ended_at)}</code>
             </div>
+            {job.status === "canceled" ? (
+              <p className="error">任务已由用户停止。</p>
+            ) : null}
             <div className="live-log-box" aria-label="运行日志">
               <h3>运行日志</h3>
               <pre className="live-log-pre">

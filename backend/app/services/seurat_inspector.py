@@ -82,7 +82,10 @@ def inspect_h5ad(data_path: Path, umap_preview_limit: int = 1500) -> dict[str, o
                 for value, count in value_counts.items():
                     value_str = str(value)
                     # 跳过 NaN、None、空字符串
-                    if value_str.lower() in ("nan", "none", "nat", "") or value_str == "<NA>":
+                    if (
+                        value_str.lower() in ("nan", "none", "nat", "")
+                        or value_str == "<NA>"
+                    ):
                         continue
                     values_with_counts.append({"value": value_str, "count": int(count)})
                 # 按计数降序排序，然后按值排序（便于查看）

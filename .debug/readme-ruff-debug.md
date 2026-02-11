@@ -28,6 +28,39 @@
   - `h5ad` input -> model encode/diffusion -> predicted expression output.
 
 ## Debug History
+### [2026-02-11 16:45] README 用户视角 Quick Start 增补
+- Problem statement:
+  - User requested a user-perspective quick start section right after project introduction in `README.md`.
+  - The section should clearly describe deployment and usage flow, and provide clickable doc links.
+- Root cause:
+  - Existing README had architecture and setup details, but no concise user-first "deploy then use" guide directly after introduction.
+- Solution:
+  - Added `## 1.5 Quick Start（用户视角）` immediately after section 1.
+  - Structured flow into:
+    - deployment path selection (local vs Docker)
+    - startup sequence (backend/frontend and expected URLs)
+    - end-user operation sequence (upload -> inspect -> prepare -> train -> result)
+    - clickable docs map for next actions and troubleshooting
+  - Added direct markdown links to:
+    - `docs/部署文档.md`
+    - `docs/seurat转换指南.md`
+    - `docs/LabFlow前端用户操作说明.md`
+    - `docs/实验室10分钟上手.md`
+    - `docs/api/seurat.md`
+    - `docs/api/jobs.md`
+    - `docs/api/datasets.md`
+    - `docs/UAT_Seurat_V2_检查清单.md`
+    - `docs/模型能做什么与前端设计理念.md`
+- Code changes:
+  - `README.md`: inserted user-oriented quick-start section and doc links.
+  - `.debug/readme-ruff-debug.md`: added this traceable record.
+- Verification result:
+  - Documentation-only update; no runtime code path changed.
+  - IDE lint diagnostics were checked for edited files.
+- Impact assessment:
+  - Improves onboarding clarity for non-technical users.
+  - Reduces time to first successful run in LabFlow UI.
+
 ### [2026-02-09 23:00] README cleanup and project-wide Ruff check
 - Problem statement:
   - `README.md` had severe encoding corruption and inconsistent operational details.

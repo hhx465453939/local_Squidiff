@@ -1,4 +1,5 @@
 """Runtime discovery API: conda envs and conda.bat candidates for R execution."""
+
 from __future__ import annotations
 
 import json
@@ -21,7 +22,9 @@ def _conda_bat_candidates_windows() -> list[str]:
     for base in os.environ.get("PATH", "").split(os.pathsep):
         p = Path(base) / "conda.bat"
         if p.exists():
-            candidates.append(str(p.resolve()))
+            s = str(p.resolve())
+            if s not in candidates:
+                candidates.append(s)
     # Common install locations
     for base in [
         Path(os.environ.get("PROGRAMDATA", "C:\\ProgramData")) / "Miniconda3",
@@ -100,8 +103,9 @@ def _run_conda_env_list(conda_bat: str) -> list[str]:
 
 @router.get("/conda-envs")
 async def get_conda_envs(
-    conda_bat: str
-    | None = Query(None, description="Optional conda.bat path to list envs for"),
+    conda_bat: str | None = Query(
+        None, description="Optional conda.bat path to list envs for"
+    ),
 ) -> JSONResponse:
     """Return conda.bat candidates and conda env names for dropdowns.
     If conda_bat is provided, return envs for that path; else envs for first candidate.

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import signal
+import subprocess
 import traceback
 from datetime import datetime, timezone
 from queue import Queue
@@ -12,6 +15,23 @@ from ..storage.state_manager import JsonStateStore
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _terminate_process_tree(pid: int) -> bool:
+    """Best-effort process termination for a running training subprocess."""
+    try:
+        if os.name == "nt":
+            result = subprocess.run(
+                ["taskkill", "/PID", str(pid), "/T", "/F"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            return result.returncode == 0
+        os.kill(pid, signal.SIGTERM)
+        return True
+    except (OSError, subprocess.SubprocessError):
+        return False
 
 
 class JobQueue:
@@ -38,6 +58,32 @@ class JobQueue:
     def enqueue(self, job_id: str) -> None:
         self._queue.put(job_id)
 
+    def cancel(self, job_id: str) -> dict[str, Any] | None:
+        job = self.store.get_job(job_id)
+        if job is None:
+            return None
+
+        status = str(job.get("status") or "")
+        if status in {"success", "failed", "canceled"}:
+            return job
+
+        if status == "queued":
+            return self.store.update_job(
+                job_id,
+                {
+                    "status": "canceled",
+                    "ended_at": _now(),
+                    "error_msg": "Canceled by user.",
+                    "cancel_requested": True,
+                },
+            )
+
+        patch: dict[str, Any] = {"cancel_requested": True}
+        pid = job.get("train_pid")
+        if isinstance(pid, int):
+            patch["cancel_signal_sent"] = _terminate_process_tree(pid)
+        return self.store.update_job(job_id, patch)
+
     def _work_loop(self) -> None:
         while not self._stop_event.is_set():
             job_id = self._queue.get()
@@ -47,6 +93,10 @@ class JobQueue:
 
             job = self.store.get_job(job_id)
             if job is None:
+                self._queue.task_done()
+                continue
+
+            if job.get("status") == "canceled":
                 self._queue.task_done()
                 continue
 
@@ -61,16 +111,31 @@ class JobQueue:
                     self._execute_predict(job_id, job)
                 else:
                     raise RuntimeError(f"Unsupported job type: {job['type']}")
-                self.store.update_job(job_id, {"status": "success", "ended_at": _now()})
+                latest = self.store.get_job(job_id) or {}
+                if latest.get("status") != "canceled":
+                    self.store.update_job(
+                        job_id, {"status": "success", "ended_at": _now()}
+                    )
             except Exception as exc:  # noqa: BLE001
-                self.store.update_job(
-                    job_id,
-                    {
-                        "status": "failed",
-                        "ended_at": _now(),
-                        "error_msg": f"{exc}\n{traceback.format_exc()}",
-                    },
-                )
+                latest = self.store.get_job(job_id) or {}
+                if latest.get("cancel_requested"):
+                    self.store.update_job(
+                        job_id,
+                        {
+                            "status": "canceled",
+                            "ended_at": _now(),
+                            "error_msg": "Canceled by user.",
+                        },
+                    )
+                else:
+                    self.store.update_job(
+                        job_id,
+                        {
+                            "status": "failed",
+                            "ended_at": _now(),
+                            "error_msg": f"{exc}\n{traceback.format_exc()}",
+                        },
+                    )
             finally:
                 self._queue.task_done()
 
@@ -96,6 +161,14 @@ class JobQueue:
             ) or control_dataset.get("path_raw")
 
         job_dir = settings.artifact_dir / "jobs" / job_id
+        planned_log_path = job_dir / "train.log"
+        self.store.update_job(
+            job_id,
+            {
+                "artifact_dir": str(job_dir),
+                "log_path": str(planned_log_path),
+            },
+        )
 
         def on_train_start(pid: int) -> None:
             self.store.update_job(job_id, {"train_pid": pid})
