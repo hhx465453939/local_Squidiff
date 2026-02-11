@@ -24,7 +24,7 @@ dependencies = [
     # 日志
     "tensorboard>=2.13.0",
 ]
-requires-python = ">= 3.8"
+requires-python = ">=3.9"
 description = "Diffusion model-based generative framework designed to predict transcriptomic changes across diverse cell types in response to a wide range of environmental changes."
 readme = "README.md"
 license = {file="LICENSE"}

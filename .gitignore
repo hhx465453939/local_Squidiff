@@ -124,8 +124,10 @@ frontend/dist/
 *.out
 *.bak
 .black-cache/
+.black-cache_
 .uv-cache/
 tmp_cache/
+_pycache__/
 
 # Local env files (keep templates)
 .env

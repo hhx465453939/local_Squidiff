@@ -513,3 +513,82 @@ pm run lint executed.
 - Impact assessment
 - README 对中文/英文读者更友好，且避免跨环境乱码问题。
 
+
+### [2026-02-11 20:35] Launcher switched to uv-run backend + Windows packaging command fix
+- Problem
+- Running `python labflow_launcher.py` started backend with `python -m uvicorn ...` from Anaconda base, which failed with `No module named uvicorn`.
+- Running `pyinstaller ...` also failed because `pyinstaller.exe` was installed in user Scripts but not on PATH.
+- Root cause
+- Launcher backend command was hardcoded to interpreter-local uvicorn module (`python -m uvicorn`) instead of uv-managed execution.
+- Packaging docs used `pyinstaller` executable directly, which is PATH-sensitive on Windows.
+- Solution
+- Changed launcher backend startup command to `uv run python -m uvicorn backend.app.main:app ...`.
+- Added `LABFLOW_UV` support to allow full-path uv binary when uv is not on PATH.
+- Updated docs to use `python -m PyInstaller ...` for stable packaging on Windows.
+- Updated README and deployment docs backend start command to uv-run style for consistency.
+- Code changes (files/functions)
+- `labflow_launcher.py` (`LauncherConfig`, `detect_uv_command`, `build_backend_cmd`, startup config in `main`)
+- `README.md` (backend startup command)
+- `docs/部署文档.md` (backend startup command + auth example)
+- `docs/Windows一键启动器.md` (backend command, packaging command, troubleshooting, LABFLOW_UV env)
+- Verification results
+- `python -m py_compile labflow_launcher.py`: passed.
+- `python labflow_launcher.py --dry-run`: now fails fast with clear uv guidance in current shell (`Missing command uv ... set LABFLOW_UV`).
+- `python -m ruff ...`: blocked in current environment (`No module named ruff`).
+- Impact assessment
+- Launcher no longer depends on base-conda uvicorn availability and follows uv-first workflow.
+- Windows packaging instructions no longer depend on PATH containing `pyinstaller.exe`.
+- Remaining prerequisite: uv must be available via PATH or `LABFLOW_UV`.
+### [2026-02-11 20:49] uv resolver split failure on launcher startup (scanpy vs requires-python>=3.8)
+- Problem
+- User reran launcher and backend startup failed before health check. uv reported unsatisfiable resolution across Python split markers, driven by `scanpy>=1.10.0` and project `requires-python >=3.8`.
+- Root cause
+- `uv run` in project mode resolves project metadata across declared Python range. Current range included Python 3.8, but scanpy in requested range does not support 3.8, causing resolver failure before command execution.
+- Solution
+- Launcher backend command switched to `uv run --active --no-project ...` so it uses the already activated environment and skips project metadata resolution for startup.
+- Tightened project metadata to `requires-python = ">=3.9"` to align with dependency compatibility and avoid future resolver conflicts.
+- Synced startup docs to the same `uv run --active --no-project` command.
+- Code changes (files/functions)
+- `labflow_launcher.py` (`build_backend_cmd`)
+- `pyproject.toml` (`requires-python`)
+- `README.md` (backend startup command)
+- `docs/部署文档.md` (backend startup command and auth example)
+- `docs/Windows一键启动器.md` (launcher backend command)
+- Verification results
+- `python -m py_compile labflow_launcher.py`: passed.
+- String checks confirm backend command now includes `--active --no-project` in code and docs.
+- ruff check unavailable in this shell (`No module named ruff`).
+- Impact assessment
+- Launcher startup no longer blocks on uv project dependency resolution splits.
+- Project metadata is now consistent with scanpy's minimum supported Python range.
+### [2026-02-11 21:02] Frontend spawn WinError 2 on launcher (npm command resolution hardening)
+- Problem
+- Backend started and passed health check, but launcher failed immediately when spawning frontend with `[WinError 2] 系统找不到指定的文件`.
+- Root cause
+- Frontend startup used bare `npm` command token. In some Windows shells/environments this can pass pre-check but still fail on subprocess spawn due command resolution differences.
+- Solution
+- Added explicit npm command resolution via `detect_npm_command()`.
+- Launcher now stores and uses an absolute npm executable path (`npm.cmd`) for both frontend build and frontend run.
+- Added `LABFLOW_NPM` env override for environments where npm resolution is unstable.
+- Updated Windows launcher doc with `LABFLOW_NPM` and WinError 2 troubleshooting.
+- Code changes (files/functions)
+- `labflow_launcher.py` (`LauncherConfig.npm_cmd`, `detect_npm_command`, `prepare_frontend_if_needed`, `build_frontend_cmd`, `main` config assembly)
+- `docs/Windows一键启动器.md` (env var and troubleshooting entries)
+- Verification results
+- `python -m py_compile labflow_launcher.py`: passed.
+- Source checks confirm frontend commands now use `config.npm_cmd`.
+- Impact assessment
+- Reduces Windows command resolution failures when starting frontend from Python subprocess.
+### [2026-02-11 21:14] Frontend startup failed: missing npm preview script
+- Problem
+- Launcher reached frontend spawn stage, but npm returned `Missing script: "preview"`, causing launcher shutdown.
+- Root cause
+- `frontend/package.json` had `dev` and `build`, but no `preview` script, while launcher default mode is `preview`.
+- Solution
+- Added `"preview": "vite preview"` script to frontend package scripts.
+- Code changes (files/functions)
+- `frontend/package.json` (`scripts.preview`)
+- Verification results
+- In this execution sandbox, direct frontend build/preview verification is constrained (EPERM on esbuild spawn), but script registration is confirmed and launcher will no longer fail with `Missing script: preview`.
+- Impact assessment
+- Launcher default frontend mode (`preview`) now matches frontend scripts and can proceed in normal Windows runtime environments.
