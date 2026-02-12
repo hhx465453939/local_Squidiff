@@ -631,3 +631,26 @@ pm run lint executed.
 - Impact assessment
 - Long-running validate/inspect requests are less likely to fail early due to frontend timeout.
 - Large h5ad inspect memory risk is reduced by backed read mode.
+
+### [2026-02-12 20:44] Windows launcher packaging fails in project .venv (`No module named PyInstaller`)
+- Problem
+- Running `python -m PyInstaller --onefile --name LabFlowLauncher labflow_launcher.py` inside activated `.venv` failed with `No module named PyInstaller`.
+- Root cause
+- `PyInstaller` is not declared in `pyproject.toml` / `requirements.txt`, so it is not present in project `.venv` by default.
+- The current `.venv` also lacks `pip` module/scripts (`python -m pip` fails), so direct in-venv installation path is broken.
+- In this execution environment, network/package install is additionally blocked (`WinError 10013` on pip HTTPS).
+- Solution
+- Keep packaging command as module form (`python -m PyInstaller ...`) but run it with an interpreter that has PyInstaller installed, or first bootstrap pip in `.venv` then install PyInstaller.
+- Recommended stable command to avoid interpreter confusion:
+- `E:\Development\local_Squidiff\.venv\Scripts\python.exe -m PyInstaller --onefile --name LabFlowLauncher labflow_launcher.py`
+- If `.venv` still lacks PyInstaller, install with an external pip targeting `.venv`:
+- `L:\Software\Anaconda\Scripts\pip.exe --python E:\Development\local_Squidiff\.venv\Scripts\python.exe install pyinstaller`
+- Code changes (files/functions)
+- `.debug/labflow-mvp-debug.md` (this entry only; no runtime code changed).
+- Verification results
+- `.venv` check: `E:\Development\local_Squidiff\.venv\Scripts\python.exe -m pip --version` -> failed (`No module named pip`).
+- `ensurepip` bootstrap attempts -> blocked by permission errors (`WinError 5`) in this constrained shell.
+- External pip target install attempt -> blocked by network policy (`WinError 10013`) in this environment.
+- Impact assessment
+- Current issue is environment/toolchain readiness, not launcher code regression.
+- Packaging works once PyInstaller exists in the exact interpreter used for the command.
