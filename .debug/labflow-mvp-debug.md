@@ -592,3 +592,42 @@ pm run lint executed.
 - In this execution sandbox, direct frontend build/preview verification is constrained (EPERM on esbuild spawn), but script registration is confirmed and launcher will no longer fail with `Missing script: preview`.
 - Impact assessment
 - Launcher default frontend mode (`preview`) now matches frontend scripts and can proceed in normal Windows runtime environments.
+
+### [2026-02-12 16:xx] Validate step false backend unreachable message
+- Problem
+- Frontend validate step showed `Cannot reach backend API ...` while browser network showed `POST /api/datasets/{id}/validate` returned HTTP 400.
+- Root cause
+- Request timeout and network failures shared a single generic message in `frontend/src/services/api.ts`.
+- Validate request can run longer (R/Conda conversion), so timeout was misreported as backend unreachable.
+- Solution
+- Added per-request timeout support to request client.
+- Split timeout error message from network-unreachable message.
+- Increased dataset validate timeout to 180s.
+- Code changes (files/functions)
+- `frontend/src/services/api.ts`: `fetchWithTimeout`, `requestJson`, `toNetworkError`, `validateDataset`.
+- Verification results
+- Frontend checkfix in progress in this round (`npm run lint`, `npm run build`).
+- Impact assessment
+- Validate step now gives accurate timeout feedback and is less likely to fail early during slow R conversion.
+
+### [2026-02-12 17:xx] Large dataset inspect stalls: timeout + memory pressure mitigation
+- Problem
+- User reported large datasets often stop at validate/Seurat inspect and cannot continue.
+- Root cause
+- Frontend request timeout was shorter than heavy processing in some paths.
+- Seurat inspect loaded h5ad in full memory mode, which is fragile for large files.
+- Solution
+- Frontend: unified API timeout to 10 minutes (600s) for all requests.
+- Backend: seurat inspector now reads h5ad in backed mode (`backed="r"`) and closes file handle after inspect.
+- Code changes (files/functions)
+- `frontend/src/services/api.ts`: `REQUEST_TIMEOUT_MS=600000`, `VALIDATE_TIMEOUT_MS=600000`.
+- `backend/app/services/seurat_inspector.py`: `_load_adata`, `_close_adata`, `inspect_h5ad` resource lifecycle.
+- `docs/LabFlow前端用户操作说明.md`: added troubleshooting section for large datasets.
+- Verification results
+- `npm run lint`: passed in this environment.
+- `npm run build`: blocked by environment permission (`spawn EPERM` from esbuild).
+- `ruff check backend/app backend/tests`: command unavailable in current environment.
+- `ruff format --check backend/app backend/tests`: command unavailable in current environment.
+- Impact assessment
+- Long-running validate/inspect requests are less likely to fail early due to frontend timeout.
+- Large h5ad inspect memory risk is reduced by backed read mode.

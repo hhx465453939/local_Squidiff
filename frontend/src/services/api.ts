@@ -160,7 +160,8 @@ function resolveApiBase(): string {
 
 const API_BASE = resolveApiBase();
 const AUTH_TOKEN_KEY = "labflow_auth_token";
-const REQUEST_TIMEOUT_MS = 15000;
+const REQUEST_TIMEOUT_MS = 600000;
+const VALIDATE_TIMEOUT_MS = 600000;
 
 type JsonMethod = "GET" | "POST" | "PUT" | "DELETE";
 
@@ -194,9 +195,15 @@ function buildRequestHeaders(hasJsonBody: boolean): HeadersInit | undefined {
   return Object.keys(headers).length > 0 ? headers : undefined;
 }
 
-function toNetworkError(err: unknown): Error {
+function toNetworkError(err: unknown, timeoutMs: number): Error {
   const raw = err instanceof Error ? err.message : String(err);
-  if (/aborted|network|failed to fetch|timeout/i.test(raw)) {
+  if (/aborterror|aborted|timeout/i.test(raw)) {
+    return new Error(
+      `Backend API request timed out after ${Math.ceil(timeoutMs / 1000)}s at ${API_BASE}. ` +
+        "The backend may still be processing this request."
+    );
+  }
+  if (/network|failed to fetch|load failed/i.test(raw)) {
     return new Error(
       `Cannot reach backend API at ${API_BASE}. Check backend status and network access.`
     );
@@ -206,14 +213,15 @@ function toNetworkError(err: unknown): Error {
 
 async function fetchWithTimeout(
   input: RequestInfo | URL,
-  init: RequestInit
+  init: RequestInit,
+  timeoutMs: number = REQUEST_TIMEOUT_MS
 ): Promise<Response> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(input, { ...init, signal: controller.signal });
   } catch (err: unknown) {
-    throw toNetworkError(err);
+    throw toNetworkError(err, timeoutMs);
   } finally {
     clearTimeout(timer);
   }
@@ -222,13 +230,16 @@ async function fetchWithTimeout(
 async function requestJson<T>(
   path: string,
   method: JsonMethod = "GET",
-  body?: unknown
+  body?: unknown,
+  options?: {
+    timeoutMs?: number;
+  }
 ): Promise<T> {
   const response = await fetchWithTimeout(`${API_BASE}${path}`, {
     method,
     headers: buildRequestHeaders(body != null),
     body: body ? JSON.stringify(body) : undefined
-  });
+  }, options?.timeoutMs ?? REQUEST_TIMEOUT_MS);
 
   if (!response.ok) {
     const text = await response.text();
@@ -309,6 +320,8 @@ export async function validateDataset(input: {
     r_conda_env: input.rCondaEnv,
     r_conda_bat: input.rCondaBat,
     rscript_bin: input.rscriptBin
+  }, {
+    timeoutMs: VALIDATE_TIMEOUT_MS
   });
 }
 
