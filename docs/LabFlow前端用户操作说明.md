@@ -216,6 +216,16 @@ npm run dev
 1. 先确认任务状态是否已进入 `running`。
 2. 检查后端目录：`backend/artifacts/jobs/<job_id>/logger/log.txt` 是否在写入。
 
+### 9.6 大数据时“校验/Seurat 解析”长时间无响应
+
+现版本前端已将 API 等待时间统一提升到 10 分钟（600 秒）。
+
+如果数据很大仍感觉“卡住”，优先按下面检查：
+1. 打开浏览器 F12 Network，确认对应请求是否还在 `pending`。
+2. 查看后端终端是否仍在打印处理日志（尤其是 R 转换与 scanpy 读取阶段）。
+3. 若最终返回超时提示，通常表示后端仍在算，可稍后重试，或先用更小数据验证流程。
+4. Windows + Conda 场景建议保持 `cmd_conda`，并使用 `condabin\\conda.bat` 的完整路径。
+
 ---
 
 ## 10. 回滚说明
